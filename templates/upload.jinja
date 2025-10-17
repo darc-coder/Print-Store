@@ -1,0 +1,199 @@
+<!doctype html>
+<html lang="en">
+
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Print Store - Upload Files</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/common.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/upload.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/checkout.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/cart-widget.css') }}">
+</head>
+
+<body>
+    <!-- Header -->
+    <div class="header">
+        <img src="{{ url_for('static', filename='assets/nitzInc.png') }}" alt="NitzInc Logo" class="logo">
+    </div>
+
+    <!-- Main Container -->
+    <div class="container">
+        <div class="content-wrapper">
+            <!-- Left Section -->
+            <div class="left-section">
+                <h1 class="main-heading">Print Store</h1>
+                <p class="subtitle">NitzInc provides Safe & Secure printouts</p>
+
+                <!-- Upload Card -->
+                <div class="upload-card">
+                    <div class="upload-header">
+                        <div class="upload-icon">
+                            <img src="{{ url_for('static', filename='assets/upload_files_colour.webp') }}" alt="Upload">
+                        </div>
+                        <div class="upload-header-text">
+                            <h2>Upload your files</h2>
+                            <p>We support PDF, JPG, PNG & more</p>
+                        </div>
+                    </div>
+
+                    <form id="uploadForm" action="/upload" method="post" enctype="multipart/form-data">
+                        <div class="drop-zone" id="dropZone">
+                            <div class="drop-zone-icon">
+                                <img src="{{ url_for('static', filename='assets/drop-file.avif') }}" alt="Drop files">
+                            </div>
+                            <p class="drop-zone-text">Drop files here</p>
+                            <input type="file" name="file" id="fileInput" class="file-input"
+                                accept=".pdf,.jpg,.jpeg,.png,.gif,.bmp,.tiff,.tif,.webp,.svg" multiple required>
+                        </div>
+
+                        <button type="button" class="upload-button" id="selectFileBtn">Upload your files</button>
+                        <p class="upload-info">Maximum upload file size: 50 MB • Maximum files: 15</p>
+
+                        <div class="selected-files" id="selectedFiles"></div>
+                    </form>
+                </div>
+            </div>
+
+            <!-- Right Section - Illustration -->
+            <div class="right-section">
+                <img src="{{ url_for('static', filename='assets/print_store_web.webp') }}"
+                    alt="Print Store Illustration" class="illustration">
+            </div>
+        </div>
+
+        <!-- Bottom Section -->
+        <div class="bottom-section">
+            <h2 class="bottom-heading">Proudly serving happy customers</h2>
+            <p class="bottom-text">We think our Print Store is awesome. But don't take our word for it!</p>
+        </div>
+    </div>
+
+    <script>
+        const dropZone = document.getElementById('dropZone');
+        const fileInput = document.getElementById('fileInput');
+        const selectFileBtn = document.getElementById('selectFileBtn');
+        const uploadForm = document.getElementById('uploadForm');
+        const selectedFilesDiv = document.getElementById('selectedFiles');
+        let filesSelected = false;
+        let allFiles = []; // Store all files separately
+
+        // Click to select file
+        selectFileBtn.addEventListener('click', () => {
+            if (filesSelected) {
+                // If files already selected, submit the form
+                uploadForm.submit();
+            } else {
+                // Otherwise, open file picker
+                fileInput.click();
+            }
+        });
+
+        dropZone.addEventListener('click', (e) => {
+            // Always allow clicking drop zone to add more files
+            fileInput.click();
+        });
+
+        // File selection handler
+        fileInput.addEventListener('change', (e) => {
+            const newFiles = Array.from(e.target.files);
+
+            // Add new files to existing collection
+            newFiles.forEach(file => {
+                // Check if file already exists (by name and size)
+                const isDuplicate = allFiles.some(f => f.name === file.name && f.size === file.size);
+                if (!isDuplicate) {
+                    allFiles.push(file);
+                }
+            });
+
+            updateFileInput();
+            displayFiles();
+        });
+
+        // Drag and drop handlers
+        dropZone.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            dropZone.classList.add('drag-over');
+        });
+
+        dropZone.addEventListener('dragleave', () => {
+            dropZone.classList.remove('drag-over');
+        });
+
+        dropZone.addEventListener('drop', (e) => {
+            e.preventDefault();
+            dropZone.classList.remove('drag-over');
+
+            const droppedFiles = Array.from(e.dataTransfer.files);
+
+            // Add dropped files to existing collection
+            droppedFiles.forEach(file => {
+                // Check if file already exists (by name and size)
+                const isDuplicate = allFiles.some(f => f.name === file.name && f.size === file.size);
+                if (!isDuplicate) {
+                    allFiles.push(file);
+                }
+            });
+
+            updateFileInput();
+            displayFiles();
+        });
+
+        function updateFileInput() {
+            // Update the file input with all collected files
+            const dataTransfer = new DataTransfer();
+            allFiles.forEach(file => {
+                dataTransfer.items.add(file);
+            });
+            fileInput.files = dataTransfer.files;
+        }
+
+        function displayFiles() {
+            if (allFiles.length > 0) {
+                let filesHTML = '';
+                let totalSize = 0;
+
+                allFiles.forEach((file, index) => {
+                    totalSize += file.size;
+                    filesHTML += `
+                        <div class="file-item">
+                            <div>
+                                <div class="file-name">${file.name}</div>
+                                <div class="file-size">${formatFileSize(file.size)}</div>
+                            </div>
+                            <button type="button" class="remove-file-btn" onclick="removeFile(${index})">×</button>
+                        </div>
+                    `;
+                });
+
+                selectedFilesDiv.innerHTML = filesHTML;
+                selectedFilesDiv.classList.add('show');
+                selectFileBtn.textContent = `Submit & Continue (${allFiles.length} file${allFiles.length > 1 ? 's' : ''})`;
+                filesSelected = true;
+            } else {
+                selectedFilesDiv.innerHTML = '';
+                selectedFilesDiv.classList.remove('show');
+                selectFileBtn.textContent = 'Upload your files';
+                filesSelected = false;
+            }
+        }
+
+        function removeFile(index) {
+            allFiles.splice(index, 1);
+            updateFileInput();
+            displayFiles();
+        }
+
+        function formatFileSize(bytes) {
+            if (bytes === 0) return '0 Bytes';
+            const k = 1024;
+            const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+            const i = Math.floor(Math.log(bytes) / Math.log(k));
+            return Math.round(bytes / Math.pow(k, i) * 100) / 100 + ' ' + sizes[i];
+        }
+    </script>
+    <script src="{{ url_for('static', filename='js/cart-widget.js') }}"></script>
+</body>
+
+</html>

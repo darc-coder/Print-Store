@@ -1,0 +1,270 @@
+/* Upload Page Specific Styles */
+/* Common styles moved to common.css */
+
+/* Main Container - Override */
+.container {
+  padding: 3rem 2rem;
+}
+
+.content-wrapper {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 4rem;
+  align-items: center;
+}
+
+/* Left Section */
+.left-section {
+  padding-right: 2rem;
+}
+
+.main-heading {
+  font-size: 4rem;
+  font-weight: 800;
+  color: #1a1a1a;
+  margin-bottom: 0.5rem;
+  line-height: 1.1;
+}
+
+.subtitle {
+  font-size: 1.25rem;
+  color: #4a5568;
+  margin-bottom: 3rem;
+  font-weight: 400;
+}
+
+/* Upload Card */
+.upload-card {
+  background: #e8eaf6;
+  border-radius: 16px;
+  padding: 2rem;
+  max-width: 500px;
+}
+
+.upload-header {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  margin-bottom: 1.5rem;
+}
+
+.upload-icon {
+  width: 60px;
+  height: 60px;
+  background: white;
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0.75rem;
+}
+
+.upload-icon img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+
+.upload-header-text h2 {
+  font-size: 1.5rem;
+  font-weight: 700;
+  color: #1a1a1a;
+  margin-bottom: 0.25rem;
+}
+
+.upload-header-text p {
+  font-size: 0.9rem;
+  color: #666;
+}
+
+/* Drop Zone */
+.drop-zone {
+  background: white;
+  border: 2px dashed #9fa8da;
+  border-radius: 12px;
+  padding: 3rem 2rem;
+  text-align: center;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  position: relative;
+  margin-bottom: 1rem;
+}
+
+.drop-zone:hover,
+.drop-zone.drag-over {
+  background: #f5f7ff;
+  border-color: #5c6bc0;
+}
+
+.drop-zone-icon {
+  width: 80px;
+  height: 80px;
+  margin: 0 auto 1rem;
+  opacity: 0.7;
+}
+
+.drop-zone-icon img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+
+.drop-zone-text {
+  color: #7986cb;
+  font-size: 1rem;
+  font-weight: 500;
+  margin-bottom: 1.5rem;
+}
+
+.file-input {
+  display: none;
+}
+
+.upload-button {
+  width: 100%;
+  background: #2e7d32;
+  color: white;
+  border: none;
+  border-radius: 8px;
+  padding: 1rem 2rem;
+  font-size: 1.1rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.3s ease;
+}
+
+.upload-button:hover {
+  background: #1b5e20;
+}
+
+.upload-button:disabled {
+  background: #a5d6a7;
+  cursor: not-allowed;
+}
+
+.upload-info {
+  text-align: center;
+  font-size: 0.85rem;
+  color: #666;
+  margin-top: 0.75rem;
+}
+
+/* Right Section - Illustration */
+.right-section {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
+.illustration {
+  max-width: 100%;
+  height: auto;
+}
+
+/* Bottom Section */
+.bottom-section {
+  margin-top: 4rem;
+  text-align: center;
+}
+
+.bottom-heading {
+  font-size: 2.5rem;
+  font-weight: 700;
+  color: #1a1a1a;
+  margin-bottom: 0.5rem;
+}
+
+.bottom-text {
+  font-size: 1.1rem;
+  color: #4a5568;
+}
+
+/* Selected Files Display */
+.selected-files {
+  background: white;
+  border-radius: 8px;
+  padding: 1rem;
+  margin-top: 1rem;
+  display: none;
+}
+
+.selected-files.show {
+  display: block;
+}
+
+.file-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.5rem;
+  border-bottom: 1px solid #e0e0e0;
+}
+
+.file-item:last-child {
+  /* border-bottom: none; */
+}
+
+.file-name {
+  font-size: 0.9rem;
+  color: #333;
+}
+
+.file-size {
+  font-size: 0.8rem;
+  color: #999;
+}
+
+.remove-file-btn {
+  background: #f44336;
+  color: white;
+  border: none;
+  border-radius: 50%;
+  width: 24px;
+  height: 24px;
+  font-size: 1.2rem;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 0.2s ease;
+  line-height: 1;
+  padding: 0;
+}
+
+.remove-file-btn:hover {
+  background: #d32f2f;
+}
+
+/* Responsive */
+@media (max-width: 968px) {
+  .content-wrapper {
+    grid-template-columns: 1fr;
+    gap: 2rem;
+  }
+
+  .left-section {
+    padding-right: 0;
+  }
+
+  .main-heading {
+    font-size: 3rem;
+  }
+
+  .right-section {
+    order: -1;
+  }
+}
+
+@media (max-width: 640px) {
+  .main-heading {
+    font-size: 2.5rem;
+  }
+
+  .bottom-heading {
+    font-size: 2rem;
+  }
+
+  .upload-card {
+    padding: 1.5rem;
+  }
+}

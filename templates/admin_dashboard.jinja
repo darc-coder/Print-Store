@@ -1,0 +1,528 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Admin Dashboard - Print Store</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/common.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/admin.css') }}">
+    <!-- Socket.IO Client -->
+    <script src="https://cdn.socket.io/4.5.4/socket.io.min.js"></script>
+</head>
+
+<body>
+    <!-- Header -->
+    <div class="header">
+        <img src="{{ url_for('static', filename='assets/nitzInc.png') }}" alt="NitzInc Logo" class="logo">
+        <div class="header-actions">
+            <div id="notificationStatus" class="notification-status" title="Notification connection status">
+                <span id="statusIndicator" class="status-indicator disconnected">⚫</span>
+                <span id="statusText">Checking...</span>
+            </div>
+            <button id="enableNotificationsBtn" class="notification-btn">
+                🔔 Enable Notifications
+            </button>
+            <span class="admin-name">👤 {{ admin_username }}</span>
+            <a href="{{ url_for('admin_logout') }}" class="logout-btn">Logout</a>
+        </div>
+    </div>
+
+    <!-- Main Container -->
+    <div class="admin-container">
+        <div class="dashboard-header">
+            <h1 class="dashboard-title">🖨️ Print Queue Manager</h1>
+            <div class="dashboard-stats">
+                <div class="stat-card">
+                    <div class="stat-value">{{ stats.pending }}</div>
+                    <div class="stat-label">Pending Approval</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-value">{{ stats.today }}</div>
+                    <div class="stat-label">Jobs Today</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-value">₹{{ stats.revenue }}</div>
+                    <div class="stat-label">Today's Revenue</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Filter Tabs -->
+        <div class="filter-tabs">
+            <button class="tab-btn {% if current_filter == 'pending' %}active{% endif %}"
+                onclick="filterJobs('pending')">
+                Pending ({{ stats.pending }})
+            </button>
+            <button class="tab-btn {% if current_filter == 'printing' %}active{% endif %}"
+                onclick="filterJobs('printing')">
+                Printing ({{ stats.printing }})
+            </button>
+            <button class="tab-btn {% if current_filter == 'completed' %}active{% endif %}"
+                onclick="filterJobs('completed')">
+                Completed ({{ stats.completed }})
+            </button>
+            <button class="tab-btn {% if current_filter == 'all' %}active{% endif %}" onclick="filterJobs('all')">
+                All Jobs
+            </button>
+        </div>
+
+        <!-- Jobs List -->
+        <div class="jobs-container">
+            {% if jobs|length == 0 %}
+            <div class="empty-state">
+                <div class="empty-icon">📭</div>
+                <h3>No pending jobs</h3>
+                <p>All caught up! New jobs will appear here.</p>
+            </div>
+            {% else %}
+            {% for job in jobs %}
+            <div class="job-card" data-job-id="{{ job.id }}">
+                <div class="job-header">
+                    <div class="job-info">
+                        <h3 class="job-id">Job #{{ job.id[:8] }}</h3>
+                        <span class="job-time">⏰ {{ job.time_ago }}</span>
+                        {% if job.status == 'pending_approval' %}
+                        <span class="status-badge pending">⏳ Pending</span>
+                        {% elif job.status == 'printing' %}
+                        <span class="status-badge printing">🖨️ Printing</span>
+                        {% elif job.status == 'completed' %}
+                        <span class="status-badge completed">✅ Completed</span>
+                        {% elif job.status == 'refunded' %}
+                        <span class="status-badge refunded">💰 Refunded</span>
+                        {% elif job.status == 'rejected' %}
+                        <span class="status-badge rejected">❌ Rejected</span>
+                        {% endif %}
+                    </div>
+                    <div class="job-amount">₹{{ job.cost }}</div>
+                </div>
+
+                <div class="job-body">
+                    <div class="job-details">
+                        <div class="detail-row">
+                            <span class="detail-label">📄 File:</span>
+                            <span class="detail-value">{{ job.filename }}</span>
+                        </div>
+                        <div class="detail-row">
+                            <span class="detail-label">📃 Pages:</span>
+                            <span class="detail-value">{{ job.pages }} pages × {{ job.copies }} copies = {{ job.pages *
+                                job.copies }} total</span>
+                        </div>
+                        <div class="detail-row">
+                            <span class="detail-label">📐 Orientation:</span>
+                            <span class="detail-value">{{ job.orientation|capitalize }}</span>
+                        </div>
+                        {% if job.approved_by %}
+                        <div class="detail-row">
+                            <span class="detail-label">👤 Approved by:</span>
+                            <span class="detail-value">{{ job.approved_by }}</span>
+                        </div>
+                        {% endif %}
+                    </div>
+
+                    {% if job.payment_screenshot %}
+                    <div class="screenshot-section">
+                        <p class="screenshot-label">📸 Payment Screenshot:</p>
+                        <a href="{{ url_for('serve_screenshot', filename=job.payment_screenshot) }}" target="_blank"
+                            class="screenshot-link">
+                            <img src="{{ url_for('serve_screenshot', filename=job.payment_screenshot) }}"
+                                alt="Payment Screenshot" class="screenshot-thumb">
+                        </a>
+                    </div>
+                    {% endif %}
+                </div>
+
+                {% if job.status == 'pending_approval' %}
+                <div class="job-actions">
+                    <form method="POST" action="{{ url_for('admin_approve', job_id=job.id) }}" style="display: inline;">
+                        <button type="submit" class="approve-btn">
+                            ✓ Approve & Print
+                        </button>
+                    </form>
+                    <form method="POST" action="{{ url_for('admin_reject', job_id=job.id) }}" style="display: inline;">
+                        <button type="submit" class="reject-btn">
+                            ✗ Reject
+                        </button>
+                    </form>
+                </div>
+                {% elif job.status == 'printing' %}
+                <div class="job-actions">
+                    <button onclick="resendPrint('{{ job.id }}')" class="resend-btn">
+                        🔄 Resend Print
+                    </button>
+                    <button onclick="checkPrintStatus('{{ job.id }}')" class="check-status-btn">
+                        🔍 Check Status
+                    </button>
+                </div>
+                {% elif job.status == 'completed' %}
+                <div class="job-actions">
+                    <button onclick="refundJob('{{ job.id }}')" class="refund-btn">
+                        💰 Refund
+                    </button>
+                </div>
+                {% endif %}
+            </div>
+            {% endfor %}
+            {% endif %}
+        </div>
+    </div>
+
+    <script>
+        // Status indicator elements
+        const statusIndicator = document.getElementById('statusIndicator');
+        const statusText = document.getElementById('statusText');
+
+        function updateStatus(status, text) {
+            statusIndicator.className = `status-indicator ${status}`;
+            statusText.textContent = text;
+
+            // Update indicator emoji
+            if (status === 'connected') {
+                statusIndicator.textContent = '🟢';
+            } else if (status === 'disconnected') {
+                statusIndicator.textContent = '⚫';
+            } else if (status === 'reconnecting') {
+                statusIndicator.textContent = '🟡';
+            }
+        }
+
+        // Filter jobs by status
+        function filterJobs(status) {
+            window.location.href = '/admin?status=' + status;
+        }
+
+        // Service Worker Registration for Push Notifications
+        if ('serviceWorker' in navigator && 'PushManager' in window) {
+            console.log('✅ Browser supports push notifications');
+            const notifyBtn = document.getElementById('enableNotificationsBtn');
+
+            // Register service worker on page load
+            (async function () {
+                try {
+                    updateStatus('reconnecting', 'Connecting...');
+
+                    console.log('🔧 Registering service worker on page load...');
+                    const registration = await navigator.serviceWorker.register('/sw.js');
+                    console.log('✅ Service Worker registered');
+
+                    await navigator.serviceWorker.ready;
+                    console.log('✅ Service Worker is ready');
+
+                    // Check if already subscribed
+                    let subscription = await registration.pushManager.getSubscription();
+
+                    if (subscription) {
+                        console.log('✅ Already subscribed to push notifications');
+                        console.log('📋 Subscription endpoint:', subscription.endpoint);
+
+                        // Re-register with server (in case server restarted)
+                        console.log('🔄 Re-registering subscription with server...');
+                        try {
+                            const response = await fetch('/admin/subscribe', {
+                                method: 'POST',
+                                headers: { 'Content-Type': 'application/json' },
+                                body: JSON.stringify(subscription)
+                            });
+
+                            if (response.ok) {
+                                console.log('✅ Subscription re-registered on server');
+                                updateStatus('connected', 'Connected');
+                                notifyBtn.textContent = '✅ Notifications Active';
+                                notifyBtn.classList.add('enabled');
+                            } else {
+                                throw new Error('Failed to register on server');
+                            }
+                        } catch (error) {
+                            console.error('❌ Failed to register on server:', error);
+                            updateStatus('disconnected', 'Not Connected');
+                            notifyBtn.textContent = '🔄 Reconnect';
+                        }
+                    } else {
+                        console.log('ℹ️  Not yet subscribed to push notifications');
+                        updateStatus('disconnected', 'Not Connected');
+                        notifyBtn.textContent = '🔔 Enable Notifications';
+                    }
+                } catch (error) {
+                    console.error('❌ Service Worker registration failed:', error);
+                    updateStatus('disconnected', 'Error');
+                }
+            })();
+
+            notifyBtn.addEventListener('click', async function () {
+                try {
+                    updateStatus('reconnecting', 'Connecting...');
+                    notifyBtn.disabled = true;
+
+                    console.log('🔔 Requesting notification permission...');
+                    // Request permission
+                    const permission = await Notification.requestPermission();
+                    console.log('📱 Permission result:', permission);
+
+                    if (permission === 'granted') {
+                        console.log('✅ Permission granted');
+
+                        // Service worker should already be registered from page load
+                        const registration = await navigator.serviceWorker.ready;
+                        console.log('✅ Using existing service worker registration');
+
+                        // Subscribe to push notifications
+                        console.log('📡 Subscribing to push notifications...');
+                        const subscription = await registration.pushManager.subscribe({
+                            userVisibleOnly: true,
+                            applicationServerKey: urlBase64ToUint8Array('{{ vapid_public_key }}')
+                        });
+                        console.log('✅ Subscribed to push notifications');
+                        console.log('📋 Subscription endpoint:', subscription.endpoint);
+
+                        // Send subscription to server
+                        console.log('📤 Sending subscription to server...');
+                        const response = await fetch('/admin/subscribe', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify(subscription)
+                        });
+
+                        if (response.ok) {
+                            console.log('✅ Subscription saved on server');
+                            updateStatus('connected', 'Connected');
+                            notifyBtn.textContent = '✅ Notifications Active';
+                            notifyBtn.classList.add('enabled');
+                            alert('✅ Push notifications enabled!');
+                        } else {
+                            console.error('❌ Failed to save subscription on server');
+                            updateStatus('disconnected', 'Failed');
+                            notifyBtn.disabled = false;
+                            alert('❌ Failed to save subscription. Please try again.');
+                        }
+                    } else {
+                        console.warn('⚠️  Notification permission denied');
+                        updateStatus('disconnected', 'Permission Denied');
+                        notifyBtn.disabled = false;
+                        alert('❌ Please allow notifications in your browser settings.');
+                    }
+                } catch (error) {
+                    console.error('❌ Error enabling notifications:', error);
+                    alert('❌ Failed to enable notifications. Error: ' + error.message);
+                }
+            });
+        } else {
+            console.warn('⚠️  Browser does not support push notifications');
+        }
+
+        // Helper function to convert VAPID key
+        function urlBase64ToUint8Array(base64String) {
+            const padding = '='.repeat((4 - base64String.length % 4) % 4);
+            const base64 = (base64String + padding)
+                .replace(/\-/g, '+')
+                .replace(/_/g, '/');
+
+            const rawData = window.atob(base64);
+            const outputArray = new Uint8Array(rawData.length);
+
+            for (let i = 0; i < rawData.length; ++i) {
+                outputArray[i] = rawData.charCodeAt(i);
+            }
+            return outputArray;
+        }
+
+        // Auto-check printing jobs status every 10 seconds
+        async function checkPrintingJobsStatus() {
+            try {
+                const response = await fetch('/api/check-all-printing-jobs');
+                if (response.ok) {
+                    const data = await response.json();
+                    if (data.updated > 0) {
+                        console.log(`📊 Updated ${data.updated} job(s) status:`, data.results);
+                        // Reload page to show updated statuses
+                        window.location.reload();
+                    }
+                }
+            } catch (error) {
+                console.error('Error checking print job status:', error);
+            }
+        }
+
+        // Resend print job
+        async function resendPrint(jobId) {
+            if (!confirm('Resend this print job? This will create a new print request.')) {
+                return;
+            }
+
+            try {
+                const response = await fetch(`/admin/resend-print/${jobId}`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' }
+                });
+
+                const data = await response.json();
+
+                if (data.success) {
+                    alert('✅ Print job resent successfully!');
+                    window.location.reload();
+                } else {
+                    alert('❌ Failed to resend: ' + (data.error || 'Unknown error'));
+                }
+            } catch (error) {
+                console.error('Error resending print:', error);
+                alert('❌ Failed to resend print job');
+            }
+        }
+
+        // Check individual print status
+        async function checkPrintStatus(jobId) {
+            try {
+                const response = await fetch(`/api/update-print-status/${jobId}`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' }
+                });
+
+                const data = await response.json();
+
+                if (data.status) {
+                    alert(`📊 Print Status:\n\nJob ID: ${jobId}\nCUPS Job: ${data.print_job_id || 'N/A'}\nStatus: ${data.status}\n\nPrevious: ${data.previous_status}`);
+
+                    // Reload if status changed
+                    if (data.status !== data.previous_status) {
+                        window.location.reload();
+                    }
+                } else {
+                    alert('❌ Failed to check status: ' + (data.error || 'Unknown error'));
+                }
+            } catch (error) {
+                console.error('Error checking status:', error);
+                alert('❌ Failed to check print status');
+            }
+        }
+
+        // Refund job
+        async function refundJob(jobId) {
+            if (!confirm('💰 Mark this job as refunded?\n\nThis action will update the job status but you must process the actual refund separately.')) {
+                return;
+            }
+
+            try {
+                const response = await fetch(`/admin/refund/${jobId}`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' }
+                });
+
+                const data = await response.json();
+
+                if (data.success) {
+                    alert('✅ Job marked as refunded!');
+                    window.location.reload();
+                } else {
+                    alert('❌ Failed to refund: ' + (data.error || 'Unknown error'));
+                }
+            } catch (error) {
+                console.error('Error refunding job:', error);
+                alert('❌ Failed to refund job');
+            }
+        }
+
+        // ============================================
+        // WebSocket Integration for Real-time Updates
+        // ============================================
+
+        let socket = null;
+        const currentFilter = '{{ current_filter }}';
+
+        function initializeWebSocket() {
+            console.log('🔌 Connecting to WebSocket server...');
+            socket = io();
+
+            socket.on('connect', () => {
+                console.log('✅ WebSocket connected');
+            });
+
+            socket.on('disconnect', () => {
+                console.log('❌ WebSocket disconnected');
+            });
+
+            // Listen for job status updates
+            socket.on('job_status_update', (data) => {
+                console.log('📡 Received job update:', data);
+                handleJobUpdate(data);
+            });
+
+            // Listen for subscription status updates (for notification indicator)
+            socket.on('subscription_status_update', (data) => {
+                console.log('📡 Subscription status:', data);
+                // Update notification status indicator if needed
+            });
+        }
+
+        function handleJobUpdate(data) {
+            const { job_id, status, action, job_data } = data;
+
+            console.log(`📊 Job ${job_id} updated: ${status} (${action})`);
+
+            // Find the job row in the current view
+            const jobRow = document.querySelector(`tr[data-job-id="${job_id}"]`);
+
+            if (jobRow) {
+                // Job exists in current view - update it
+                updateJobRow(jobRow, job_data);
+            } else {
+                // Job not in current view - might need to reload if it should be visible
+                if (shouldShowJobInCurrentFilter(status)) {
+                    console.log('🔄 Job should be visible in current filter, reloading page...');
+                    window.location.reload();
+                }
+            }
+        }
+
+        function updateJobRow(row, jobData) {
+            // Update status badge
+            const statusBadge = row.querySelector('.status-badge');
+            if (statusBadge) {
+                statusBadge.className = 'status-badge status-' + jobData.status;
+                statusBadge.textContent = formatStatus(jobData.status);
+            }
+
+            // If job moved to different status, fade out and remove
+            if (!shouldShowJobInCurrentFilter(jobData.status)) {
+                row.style.transition = 'opacity 0.5s';
+                row.style.opacity = '0';
+                setTimeout(() => {
+                    row.remove();
+                    // Reload to update counts
+                    window.location.reload();
+                }, 500);
+            }
+        }
+
+        function shouldShowJobInCurrentFilter(status) {
+            if (currentFilter === 'pending') {
+                return status === 'pending_approval';
+            } else if (currentFilter === 'printing') {
+                return status === 'printing';
+            } else if (currentFilter === 'completed') {
+                return status === 'completed' || status === 'refunded';
+            } else {
+                // 'all' filter - show everything
+                return true;
+            }
+        }
+
+        function formatStatus(status) {
+            const statusMap = {
+                'pending_approval': '⏳ Pending',
+                'printing': '🖨️ Printing',
+                'completed': '✅ Completed',
+                'rejected': '❌ Rejected',
+                'refunded': '💰 Refunded',
+                'error': '⚠️ Error'
+            };
+            return statusMap[status] || status;
+        }
+
+        // Initialize WebSocket on page load
+        initializeWebSocket();
+
+        // Socket.IO has built-in fallback to polling if WebSocket fails
+        // No need for manual polling - WebSocket handles everything!
+    </script>
+</body>
+
+</html>
