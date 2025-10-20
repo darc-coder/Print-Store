@@ -77,14 +77,17 @@ def print_file(file_path, printer="G3000-series", copies=1, orientation="portrai
 
 
 def check_print_job_status(job_id):
-    """Check the status of a CUPS print job"""
+    """Check the status of a CUPS print job
+    
+    Returns one of: 'printing', 'pending', 'completed', 'canceled', 'aborted', 'error', 'unknown'
+    """
     print(f"\n🔍 Checking CUPS status for job: {job_id}")
     
     if not job_id:
         print(f"❌ No job ID provided")
         return 'unknown'
     
-    # First, check if job is in the ACTIVE queue (not completed)
+    # First, check if job is in the ACTIVE queue (printing/pending)
     cmd_active = ['lpstat', '-o']
     print(f"💻 Running: {' '.join(cmd_active)}")
     
@@ -120,22 +123,64 @@ def check_print_job_status(job_id):
             # Job is in active queue but no specific status - assume printing
             print(f"📋 Status: printing (in active queue)")
             return 'printing'
-    else:
-        print(f"❌ Job {job_id} NOT in active queue")
-        
-        # Job not in active queue - check completed jobs
-        cmd_completed = ['lpstat', '-W', 'completed', '-o']
-        print(f"💻 Running: {' '.join(cmd_completed)}")
-        
-        proc_completed = subprocess.run(cmd_completed, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+    
+    # Job not in active queue - check for completed/canceled/aborted
+    print(f"❌ Job {job_id} NOT in active queue")
+    
+    # Check completed jobs with detailed output
+    cmd_completed = ['lpstat', '-W', 'completed', '-l']
+    print(f"💻 Running: {' '.join(cmd_completed)}")
+    
+    proc_completed = subprocess.run(cmd_completed, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+    
+    if proc_completed.returncode == 0:
         completed_output = proc_completed.stdout
         
-        if proc_completed.returncode == 0 and job_id in completed_output:
-            print(f"✅ Job {job_id} found in COMPLETED jobs")
-            print(f"📋 Status: completed")
-            return 'completed'
+        # Check if this specific job is in the output
+        if job_id in completed_output:
+            print(f"✅ Job {job_id} found in COMPLETED history")
+            
+            # Parse the output to find this job's details
+            lines = completed_output.split('\n')
+            job_section = []
+            in_job = False
+            
+            for line in lines:
+                if job_id in line:
+                    in_job = True
+                    job_section.append(line)
+                elif in_job:
+                    # Continue collecting lines until next job or empty line
+                    if line and not line[0].isspace() and '-' in line:
+                        # Start of next job
+                        break
+                    job_section.append(line)
+            
+            job_details = '\n'.join(job_section).lower()
+            print(f"📋 Job section:\n{job_details}")
+            
+            # Analyze the job state
+            if 'canceled' in job_details or 'cancelled' in job_details:
+                print(f"📋 Status: canceled")
+                return 'canceled'
+            elif 'aborted' in job_details:
+                print(f"📋 Status: aborted")
+                return 'aborted'
+            elif 'error' in job_details or 'failed' in job_details:
+                print(f"📋 Status: error")
+                return 'error'
+            elif 'completed' in job_details or 'finished' in job_details:
+                print(f"📋 Status: completed")
+                return 'completed'
+            else:
+                # Found in completed queue but no clear status - assume completed
+                print(f"📋 Status: completed (found in history, no errors)")
+                return 'completed'
         else:
-            print(f"ℹ️  Job {job_id} not found in completed jobs either")
-            print(f"📋 Status: completed (assumed - not in any queue)")
-            # Job not found anywhere - assume completed
-            return 'completed'
+            print(f"ℹ️  Job {job_id} not found in completed history")
+    
+    # Job not found anywhere - might be very old or already purged
+    # Check if it's still pending somewhere
+    print(f"ℹ️  Job {job_id} not found in any queue (might be purged)")
+    print(f"📋 Status: unknown (job not found)")
+    return 'unknown'

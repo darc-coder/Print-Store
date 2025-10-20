@@ -3,7 +3,7 @@ Database initialization and helper functions
 """
 import sqlite3
 from pathlib import Path
-from flask import url_for
+from flask import url_for, has_request_context
 from config import Config
 
 
@@ -93,9 +93,15 @@ def get_job(job_id):
     if has_print_color:
         print_color = row[base_idx] if len(row) > base_idx else 'bw'
     
-    # Generate preview_url from stored_path
+    # Generate preview_url from stored_path (only if within request context)
     filename = Path(row[2]).name if row[2] else None
-    preview_url = url_for('user.serve_upload', filename=filename) if filename else None
+    preview_url = None
+    if filename and has_request_context():
+        try:
+            preview_url = url_for('user.serve_upload', filename=filename)
+        except Exception:
+            # If url_for fails (e.g., no application context), use relative path
+            preview_url = f'/uploads/{filename}'
     
     return dict(
         id=row[0], 

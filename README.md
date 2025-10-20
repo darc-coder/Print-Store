@@ -157,6 +157,27 @@ python check_printer_options.py
 
 Outputs all available CUPS options for the configured printer, including color modes, paper sizes, and quality settings.
 
+### Automated File Cleanup
+
+Prevent disk space issues with automatic cleanup:
+
+```bash
+# Setup automated daily cleanup (runs at 3 AM)
+./setup_cleanup.sh
+
+# Manual cleanup (test first with dry run)
+./cleanup_old_files.py --dry-run
+./cleanup_old_files.py
+```
+
+**What gets cleaned:**
+
+- Completed jobs after 14 days
+- Rejected jobs after 7 days
+- Orphaned files after 3 days
+
+⚠️ **Warning:** This permanently deletes old files to save disk space!
+
 ## 📋 User Flow
 
 ### 1. Upload Files
@@ -548,8 +569,78 @@ else:
 
 Test your printer's options first with `lpoptions -p YOUR_PRINTER -l`
 
-## �📚 Documentation
+---
 
+## 🌐 Production Deployment
+
+### Deploy to Raspberry Pi with Cloudflare Tunnel
+
+For a complete production deployment, see **[DEPLOYMENT_GUIDE.md](DEPLOYMENT_GUIDE.md)** for detailed step-by-step instructions.
+
+**Quick Overview:**
+
+```bash
+# On Raspberry Pi
+cd ~/RpiPrint
+
+# 1. Setup Cloudflare Tunnel
+./setup_cloudflare_tunnel.sh
+
+# 2. Install as System Service
+./install_service.sh
+
+# 3. Access from anywhere
+# https://your-domain.com
+```
+
+**What You Get:**
+
+- ✅ **Secure HTTPS** access from anywhere in the world
+- ✅ **No port forwarding** needed - tunnel handles everything
+- ✅ **Free SSL certificate** from Cloudflare
+- ✅ **DDoS protection** and CDN
+- ✅ **Auto-start on boot** - runs 24/7
+- ✅ **Professional setup** with monitoring and logging
+- ✅ **Own domain support** or free Cloudflare subdomain
+
+**Deployment Files:**
+
+| File                         | Purpose                                     |
+| ---------------------------- | ------------------------------------------- |
+| `DEPLOYMENT_GUIDE.md`        | Complete deployment instructions (12 parts) |
+| `DEPLOYMENT_CHECKLIST.md`    | Step-by-step checklist                      |
+| `app_production.py`          | Production server with security hardening   |
+| `config_production.py`       | Production configuration                    |
+| `setup_cloudflare_tunnel.sh` | Automated Cloudflare tunnel setup           |
+| `install_service.sh`         | Service installation script                 |
+| `rpiprint.service`           | Systemd service file                        |
+| `.env.production`            | Production environment template             |
+| `make_executable.sh`         | Makes all scripts executable                |
+
+**System Requirements:**
+
+- Raspberry Pi 4 (2GB+ RAM)
+- Raspberry Pi OS (Lite or Desktop)
+- Canon G3000 printer with CUPS
+- Internet connection
+- Cloudflare account (free)
+
+**Access:**
+
+- **Main site:** `https://your-domain.com`
+- **Admin panel:** `https://your-domain.com/admin/login`
+- **Works on:** Any device, any browser, anywhere in the world
+
+See [DEPLOYMENT_GUIDE.md](DEPLOYMENT_GUIDE.md) for complete instructions.
+
+---
+
+## 📚 Documentation
+
+- **[DEPLOYMENT_GUIDE.md](DEPLOYMENT_GUIDE.md)** - Complete production deployment guide
+- **[DEPLOYMENT_CHECKLIST.md](DEPLOYMENT_CHECKLIST.md)** - Deployment verification checklist
+- **[TRANSFER_GUIDE.md](TRANSFER_GUIDE.md)** - File transfer options to Raspberry Pi
+- **[CLEANUP_GUIDE.md](CLEANUP_GUIDE.md)** - Automated file cleanup documentation
 - **[MODULARIZATION_SUMMARY.md](MODULARIZATION_SUMMARY.md)** - Full details on modular architecture
 - **[QUICK_REFERENCE.md](QUICK_REFERENCE.md)** - Developer quick reference guide
 
