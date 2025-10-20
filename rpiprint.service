@@ -1,0 +1,27 @@
+[Unit]
+Description=RpiPrint Web Service - Print Management System
+After=network.target cups.service
+Wants=cups.service
+
+[Service]
+Type=simple
+User=pi
+Group=pi
+WorkingDirectory=/home/pi/RpiPrint
+Environment="PATH=/home/pi/RpiPrint/venv/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
+Environment="PYTHONUNBUFFERED=1"
+ExecStart=/home/pi/RpiPrint/venv/bin/python3 /home/pi/RpiPrint/app_production.py
+Restart=always
+RestartSec=10
+StandardOutput=journal
+StandardError=journal
+
+# Security hardening
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=read-only
+ReadWritePaths=/home/pi/RpiPrint/uploads /home/pi/RpiPrint/screenshots /home/pi/RpiPrint/jobs.db /home/pi/RpiPrint/rpiprint.log
+
+[Install]
+WantedBy=multi-user.target

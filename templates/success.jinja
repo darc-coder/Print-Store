@@ -123,8 +123,18 @@
         let allCompleted = false;
         let socket = null;
 
-        // Status display configuration with emoji, text, and CSS classes
+        // Status configuration with emojis, text, and CSS classes
         const statusConfig = {
+            'pending': {
+                icon: '🕒',
+                text: 'Pending',
+                class: 'pending'
+            },
+            'approved': {
+                icon: '✅',
+                text: 'Approved',
+                class: 'approved'
+            },
             'printing': {
                 icon: '🖨️',
                 text: 'Printing',
@@ -135,15 +145,15 @@
                 text: 'Completed',
                 class: 'completed'
             },
-            'pending': {
-                icon: '⏳',
-                text: 'Pending',
-                class: 'pending'
+            'canceled': {
+                icon: '🚫',
+                text: 'Canceled',
+                class: 'error'
             },
-            'pending_approval': {
-                icon: '⏳',
-                text: 'Pending Approval',
-                class: 'pending'
+            'aborted': {
+                icon: '⛔',
+                text: 'Aborted',
+                class: 'error'
             },
             'error': {
                 icon: '❌',
@@ -159,10 +169,13 @@
                 icon: '💰',
                 text: 'Refunded',
                 class: 'refunded'
+            },
+            'unknown': {
+                icon: '❓',
+                text: 'Unknown',
+                class: 'unknown'
             }
-        };
-
-        // Format and update status badge with emoji, text, and styling
+        };        // Format and update status badge with emoji, text, and styling
         function updateStatusBadge(jobId, status) {
             const badge = document.getElementById(`status-${jobId}`);
             if (badge) {
@@ -193,6 +206,7 @@
         async function checkAllJobsCompleted() {
             try {
                 let completedCount = 0;
+                let failedCount = 0;
 
                 for (const jobId of jobIds) {
                     const response = await fetch(`/api/job-status/${jobId}`);
@@ -204,11 +218,13 @@
 
                         if (data.status === 'completed') {
                             completedCount++;
+                        } else if (data.status === 'canceled' || data.status === 'aborted' || data.status === 'error' || data.status === 'rejected') {
+                            failedCount++;
                         }
                     }
                 }
 
-                // If all jobs are completed
+                // If all jobs are completed successfully
                 if (completedCount === jobIds.length && !allCompleted) {
                     allCompleted = true;
                     console.log('✅ All jobs completed!');
@@ -220,6 +236,19 @@
 
                     // Show celebration
                     createConfetti();
+                }
+
+                // If some jobs failed
+                else if (failedCount > 0 && (completedCount + failedCount === jobIds.length)) {
+                    console.log(`⚠️ ${failedCount} job(s) failed, ${completedCount} completed`);
+
+                    if (completedCount > 0) {
+                        document.querySelector('.success-title').textContent = `⚠️ ${completedCount} of ${jobIds.length} Jobs Completed`;
+                        document.querySelector('.success-message').textContent = `${failedCount} job(s) failed. Please contact admin.`;
+                    } else {
+                        document.querySelector('.success-title').textContent = '❌ Print Jobs Failed';
+                        document.querySelector('.success-message').textContent = 'All jobs failed. Please contact admin.';
+                    }
                 }
             } catch (error) {
                 console.error('Error checking job completion:', error);
