@@ -164,8 +164,9 @@
                     </div>
 
                     <!-- QR Code -->
+                    <div class="file-name">Pay Here: </div>
                     <div class="qr-section-sidebar">
-                        <img src="/static/assets/upi-qr-placeholder.png" alt="UPI QR Code" class="qr-code-sidebar">
+                        <img src="/static/assets/upi-qr.png" alt="UPI QR Code" class="qr-code-sidebar">
                     </div>
 
                     <!-- Bill Details -->

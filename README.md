@@ -1,6 +1,6 @@
 # RpiPrint
 
-A modern web-based print service with **WebSocket real-time updates**, persistent shopping cart, payment screenshot verification, admin dashboard, and automated CUPS print monitoring. Built with Flask-SocketIO for instant status updates without polling.
+A modern web-based print service with **WebSocket real-time updates**, persistent shopping cart, **B&W and Color printing**, payment screenshot verification, admin dashboard, and automated CUPS print monitoring. Built with Flask-SocketIO for instant status updates without polling. Features a **modular blueprint architecture** for maintainability and scalability.
 
 ## ✨ Key Features
 
@@ -26,10 +26,20 @@ A modern web-based print service with **WebSocket real-time updates**, persisten
 - **Real-time sync** - Settings update across all pages
 - **Smart navigation** - Browser back/forward buttons work correctly
 
+### 🎨 Color & B&W Printing
+
+- **Print mode selection** - Choose Black & White or Color for each file
+- **Visual indicators** - Grayscale/CMYK icons for easy identification
+- **Bulk settings** - Apply color mode to all files at once
+- **Same pricing** - ₹5/page for both B&W and Color
+- **Canon G3000 support** - Uses printer-specific CNIJGrayScale option
+- **Admin visibility** - Dashboard shows each job's color mode
+
 ### ⚙️ Advanced Print Settings
 
 - **Copies** - 1-99 copies per job with instant cost updates
 - **Orientation** - Portrait or Landscape
+- **Color Mode** - Black & White or Color printing
 - **Copy indicator** - Visual badges showing "×20" for multiple copies
 - **Page calculation** - Clear breakdown: "10 pages × 20 copies = 200 pages"
 
@@ -56,7 +66,7 @@ A modern web-based print service with **WebSocket real-time updates**, persisten
 - **CUPS integration** - Automatic print job monitoring via lpstat
 - **Responsive shutdown** - Graceful Ctrl+C with signal handlers
 - **Thread safety** - Single background monitor in debug mode
-- **Consolidated CSS** - Shared styles in common.css (195 lines)
+- **Modular architecture** - Clean code organization with blueprints
 - **Enhanced status display** - 7 status types with emoji icons
 - **Form validation** - Dynamic required attributes for file inputs
 
@@ -96,11 +106,19 @@ pip install -r requirements.txt
 SECRET_KEY=your-secret-key-change-in-production
 ADMIN_USERNAME=admin
 ADMIN_PASSWORD=admin123
-PRINTER_NAME=Canon_G3000
+PRINTER_NAME=Canon_G3000_W
 COST_PER_PAGE=5.0
 ```
 
-5. **Run the server:**
+5. **Initialize database (first run only):**
+
+```bash
+python app.py
+# Database will be created automatically
+# If you need to reset: python reset_db.py
+```
+
+6. **Run the server:**
 
 ```bash
 python app.py
@@ -111,11 +129,33 @@ Server starts on:
 - **http://localhost:5500**
 - **http://192.168.0.116:5500** (local network access)
 
-6. **Access:**
+7. **Access:**
 
 - **Main app:** http://localhost:5500
 - **Admin login:** http://localhost:5500/admin/login
 - **Test notifications:** http://localhost:5500/test-notifications
+
+## 🛠️ Utility Scripts
+
+### Database Reset
+
+Reset the database to apply schema updates or start fresh:
+
+```bash
+python reset_db.py
+```
+
+⚠️ **Warning:** This will delete all existing jobs and reset the database!
+
+### Check Printer Options
+
+Test your CUPS printer to discover available options:
+
+```bash
+python check_printer_options.py
+```
+
+Outputs all available CUPS options for the configured printer, including color modes, paper sizes, and quality settings.
 
 ## 📋 User Flow
 
@@ -133,11 +173,13 @@ Home (/) → Upload/Drag files → Auto-redirect to checkout
 ### 2. Configure Settings
 
 ```
-Checkout (/checkout) → Adjust copies/orientation → See real-time price
+Checkout (/checkout) → Adjust copies/orientation/color mode → See real-time price
 ```
 
 - Change copies: 1-99
 - Select orientation: Portrait/Landscape
+- Choose color mode: Black & White or Color
+- Set all files to same color mode with one click
 - Instant cost calculation
 - Visual "×20" badges for multiple copies
 
@@ -200,17 +242,19 @@ Dashboard (/admin) → Pending tab → New jobs appear instantly
 - See all pending jobs without refresh
 - WebSocket updates when new jobs submitted
 - View uploaded payment screenshot
-- Check job details (pages, copies, cost)
+- Check job details (pages, copies, cost, **color mode**)
+- Visual color mode indicator (🎨 Black & White / Color)
 
 ### 3. Approve/Reject/Refund
 
 ```
-Click Approve → Instant WebSocket broadcast → User sees success page
+Click Approve → Instant WebSocket broadcast → Print with color mode → User sees success page
 ```
 
-- **Approve** - Job moves to Printing, user redirected to success
+- **Approve** - Job sent to CUPS printer with correct color settings
 - **Reject** - User sees rejection with retry button
 - **Refund** - Admin can refund completed jobs
+- **Resend Print** - Reprint job with original color mode
 - Instant user notification via WebSocket
 - Push notification sent to admin for new jobs
 
@@ -249,6 +293,7 @@ Tabs: Pending | Printing | Completed | Rejected | Refunded | All
 **System:**
 
 - **CUPS** - Print system (lpstat, lp commands)
+- **Canon G3000** - Target printer with CNIJGrayScale support
 - **macOS** - Development environment (compatible with Linux)
 
 ### WebSocket Events
@@ -288,7 +333,7 @@ Tabs: Pending | Printing | Completed | Rejected | Refunded | All
 
 ### Routes
 
-#### Public Routes
+#### Public Routes (user_bp)
 
 | Route                      | Method | Description                         |
 | -------------------------- | ------ | ----------------------------------- |
@@ -299,30 +344,38 @@ Tabs: Pending | Printing | Completed | Rejected | Refunded | All
 | `/waiting`                 | GET    | Wait for admin approval (WebSocket) |
 | `/success`                 | GET    | Success page with print status      |
 | `/get-screenshot/<job_id>` | GET    | View payment screenshot             |
-| `/test-notifications`      | GET    | Test push notifications page        |
+| `/uploads/<filename>`      | GET    | Serve uploaded files                |
 
-#### Admin Routes
+#### Admin Routes (admin_bp - `/admin` prefix)
 
-| Route            | Method   | Description                       |
-| ---------------- | -------- | --------------------------------- |
-| `/admin/login`   | GET/POST | Admin login                       |
-| `/admin/logout`  | GET      | Admin logout                      |
-| `/admin`         | GET      | Admin dashboard                   |
-| `/admin/approve` | POST     | Approve job + WebSocket broadcast |
-| `/admin/reject`  | POST     | Reject job + WebSocket broadcast  |
-| `/admin/refund`  | POST     | Refund job + WebSocket broadcast  |
+| Route                        | Method   | Description                      |
+| ---------------------------- | -------- | -------------------------------- |
+| `/admin/login`               | GET/POST | Admin login                      |
+| `/admin/logout`              | GET      | Admin logout                     |
+| `/admin`                     | GET      | Admin dashboard                  |
+| `/admin/approve`             | POST     | Approve job + CUPS print         |
+| `/admin/reject`              | POST     | Reject job + WebSocket broadcast |
+| `/admin/refund`              | POST     | Refund job + WebSocket broadcast |
+| `/admin/resend-print`        | POST     | Resend print to CUPS             |
+| `/admin/update-print-status` | POST     | Update CUPS job status           |
 
-#### API Endpoints
+#### API Endpoints (api_bp - `/api` prefix)
 
-| Endpoint                | Method | Description                     |
-| ----------------------- | ------ | ------------------------------- |
-| `/api/cart-summary`     | GET    | Cart count and total cost       |
-| `/api/cart-details`     | GET    | Full cart with all items        |
-| `/api/update-cart-item` | POST   | Update copies/orientation       |
-| `/api/job-status`       | POST   | Get job status by IDs           |
-| `/api/get-screenshot`   | GET    | Get screenshot base64           |
-| `/api/subscribe`        | POST   | Subscribe to push notifications |
-| `/api/unsubscribe`      | POST   | Unsubscribe from push           |
+| Endpoint                | Method | Description                          |
+| ----------------------- | ------ | ------------------------------------ |
+| `/api/cart-summary`     | GET    | Cart count and total cost            |
+| `/api/cart-details`     | GET    | Full cart with all items             |
+| `/api/update-cart-item` | POST   | Update copies/orientation/color mode |
+| `/api/job-status`       | POST   | Get job status by IDs                |
+| `/api/get-screenshot`   | GET    | Get screenshot base64                |
+| `/api/subscribe`        | POST   | Subscribe to push notifications      |
+| `/api/unsubscribe`      | POST   | Unsubscribe from push                |
+
+#### Test Routes (test_bp)
+
+| Endpoint              | Method | Description             |
+| --------------------- | ------ | ----------------------- |
+| `/test-notifications` | GET    | Test push notifications |
 
 **Removed Endpoints (obsolete polling):**
 
@@ -334,57 +387,105 @@ Tabs: Pending | Printing | Completed | Rejected | Refunded | All
 
 ```
 RpiPrint/
-├── app.py                      # Main Flask application (1576 lines)
+├── app.py                      # Main Flask application (modular blueprint architecture)
+├── config.py                   # Configuration settings
 ├── requirements.txt            # Python dependencies
 ├── jobs.db                     # SQLite database
 ├── vapid.json                  # Push notification keys
-├── sw.js                       # Service worker
-├── .env                        # Configuration (create manually)
+├── sw.js                       # Service worker for push notifications
+├── .env                        # Environment configuration (create manually)
+├── reset_db.py                 # Database reset utility
+├── check_printer_options.py    # CUPS printer testing tool
 ├── venv/                       # Virtual environment
+│
+├── models/                     # Database layer
+│   └── database.py             # SQLite operations, schema management
+│
+├── utils/                      # Utility functions
+│   ├── file_utils.py           # File handling, PDF processing
+│   ├── print_utils.py          # CUPS printing with CNIJGrayScale
+│   └── notification_utils.py   # Push notifications
+│
+├── services/                   # Business logic
+│   ├── cart_service.py         # Session cart management
+│   └── cups_monitor.py         # Background CUPS job monitoring
+│
+├── websocket/                  # WebSocket handlers
+│   └── events.py               # SocketIO event handlers
+│
+├── routes/                     # HTTP endpoints (Blueprints)
+│   ├── user_routes.py          # Public routes (user_bp)
+│   ├── admin_routes.py         # Admin routes (admin_bp)
+│   ├── api_routes.py           # API routes (api_bp)
+│   └── test_routes.py          # Test routes (test_bp)
+│
 ├── uploads/                    # Uploaded PDF/image files
 ├── screenshots/                # Payment screenshots
+│
 ├── templates/                  # Jinja2 templates
-│   ├── upload.html             # Home/upload page
-│   ├── checkout.html           # Cart with payment sidebar
-│   ├── waiting.html            # Approval waiting (WebSocket)
-│   ├── success.html            # Success with live status
-│   ├── status.html             # Print status page
-│   ├── admin_dashboard.html    # Admin dashboard (WebSocket)
-│   └── test_notifications.html # Push notification testing
+│   ├── upload.jinja            # Home/upload page
+│   ├── checkout.jinja          # Cart with color mode selection
+│   ├── waiting.jinja           # Approval waiting (WebSocket)
+│   ├── success.jinja           # Success with live status
+│   ├── admin_dashboard.jinja   # Admin dashboard (WebSocket)
+│   ├── admin_login.jinja       # Admin login page
+│   ├── test_notifications.jinja# Push notification testing
+│   └── partials/               # Reusable template components
+│
 ├── static/
+│   ├── assets/
+│   │   └── drop-file.avif      # File upload illustration
 │   ├── css/
-│   │   ├── common.css          # Shared styles (NEW - 195 lines)
+│   │   ├── common.css          # Shared styles (195 lines)
 │   │   ├── upload.css          # Upload page styles
-│   │   ├── checkout.css        # Checkout page styles
+│   │   ├── checkout.css        # Checkout page with color selection
 │   │   ├── waiting.css         # Waiting page styles (468 lines)
 │   │   ├── success.css         # Success page styles
 │   │   ├── admin.css           # Admin dashboard styles
 │   │   └── cart-widget.css     # Floating cart widget (125 lines)
 │   └── js/
-│       ├── checkout.js         # Checkout page logic
+│       ├── checkout.js         # Checkout logic with color mode
 │       └── cart-widget.js      # Cart widget logic
-└── assets/
-    └── drop-file.avif          # File upload illustration
+└── __pycache__/                # Python bytecode cache
 ```
+
+### Modular Architecture
+
+The application uses **Flask Blueprints** for clean separation of concerns:
+
+- **user_bp** (`/`) - Public-facing routes
+- **admin_bp** (`/admin`) - Admin-only routes with authentication
+- **api_bp** (`/api`) - RESTful API endpoints
+- **test_bp** (`/`) - Testing and debugging routes
+
+**Key Benefits:**
+
+- ✅ Easy to maintain and extend
+- ✅ Clear separation of concerns
+- ✅ Independent testing of modules
+- ✅ Reusable components across blueprints
 
 ## 💾 Database Schema
 
 ```sql
 CREATE TABLE jobs (
-    id TEXT PRIMARY KEY,           -- Unique job ID (UUID)
-    filename TEXT NOT NULL,        -- Original filename
-    stored_path TEXT NOT NULL,     -- Path to uploaded file
-    pages INTEGER NOT NULL,        -- Number of pages
-    cost REAL NOT NULL,            -- Total cost (pages × copies × rate)
-    status TEXT NOT NULL,          -- pending_approval/approved/printing/completed/rejected/refunded
-    copies INTEGER DEFAULT 1,      -- Number of copies (1-99)
-    orientation TEXT DEFAULT 'portrait', -- portrait/landscape
-    payment_screenshot TEXT,       -- Path to payment screenshot
-    submitted_at TEXT NOT NULL,    -- ISO timestamp (submission)
-    approved_at TEXT,              -- ISO timestamp (approval)
-    approved_by TEXT,              -- Admin username
-    rejection_reason TEXT,         -- Reason for rejection (if any)
-    cups_job_id TEXT               -- CUPS job ID for tracking
+    id TEXT PRIMARY KEY,                      -- Unique job ID (UUID)
+    filename TEXT NOT NULL,                   -- Original filename
+    stored_path TEXT NOT NULL,                -- Path to uploaded file
+    pages INTEGER NOT NULL,                   -- Number of pages
+    cost REAL NOT NULL,                       -- Total cost (pages × copies × rate)
+    status TEXT NOT NULL,                     -- pending_approval/approved/printing/completed/rejected/refunded
+    copies INTEGER DEFAULT 1,                 -- Number of copies (1-99)
+    orientation TEXT DEFAULT 'portrait',      -- portrait/landscape
+    print_color TEXT DEFAULT 'bw',            -- bw/color - NEW in v2.0
+    payment_screenshot TEXT,                  -- Path to payment screenshot
+    submitted_at TEXT NOT NULL,               -- ISO timestamp (submission)
+    approved_at TEXT,                         -- ISO timestamp (approval)
+    approved_by TEXT,                         -- Admin username
+    rejection_reason TEXT,                    -- Reason for rejection (if any)
+    print_job_id TEXT,                        -- CUPS print job ID (lpstat tracking)
+    refunded_at TEXT,                         -- ISO timestamp (refund)
+    refunded_by TEXT                          -- Admin who refunded
 );
 ```
 
@@ -396,6 +497,96 @@ pending_approval → approved → printing → completed
                  ↓ refunded (admin action)
 ```
 
+**Color Mode Options:**
+
+- `bw` - Black & White (CNIJGrayScale=1)
+- `color` - Color (CNIJGrayScale=0)
+
+## �️ Printer Configuration
+
+### Canon G3000 Series
+
+This application is optimized for **Canon G3000** printers using CUPS on macOS/Linux.
+
+**Color Mode Implementation:**
+
+- Uses Canon's proprietary `CNIJGrayScale` option
+- `CNIJGrayScale=1` - Black & White printing
+- `CNIJGrayScale=0` - Color printing
+
+**CUPS Print Command Example:**
+
+```bash
+lp -d Canon_G3000_W -n 1 -o portrait -o CNIJGrayScale=1 file.pdf
+```
+
+**Printer Setup:**
+
+1. Install Canon printer drivers for your OS
+2. Add printer to CUPS: `System Preferences → Printers & Scanners`
+3. Note the printer name (e.g., `Canon_G3000_W`)
+4. Update `PRINTER_NAME` in `.env` or `config.py`
+
+**Testing Printer Options:**
+
+```bash
+lpoptions -p Canon_G3000_W -l  # List all available options
+python check_printer_options.py  # Formatted output with highlights
+```
+
+### Other Printers
+
+For non-Canon printers, you may need to modify `utils/print_utils.py`:
+
+```python
+# Standard CUPS color options (most printers):
+if color_mode == 'bw':
+    cmd.extend(['-o', 'ColorModel=Gray'])
+else:
+    cmd.extend(['-o', 'ColorModel=RGB'])
+```
+
+Test your printer's options first with `lpoptions -p YOUR_PRINTER -l`
+
+## �📚 Documentation
+
+- **[MODULARIZATION_SUMMARY.md](MODULARIZATION_SUMMARY.md)** - Full details on modular architecture
+- **[QUICK_REFERENCE.md](QUICK_REFERENCE.md)** - Developer quick reference guide
+
+## 🔄 Version History
+
+### v2.0 - Color Print Edition (Current)
+
+- ✅ Added Black & White and Color print mode selection
+- ✅ Modularized app into blueprints (models, utils, services, routes, websocket)
+- ✅ Canon G3000 CNIJGrayScale support
+- ✅ Enhanced database schema with `print_color` field
+- ✅ Admin dashboard shows color mode for each job
+- ✅ Bulk color mode setting for all files
+- ✅ Database reset utility
+
+### v1.0 - Real-Time Edition
+
+- ✅ WebSocket real-time updates
+- ✅ Persistent shopping cart
+- ✅ CUPS monitoring with background task
+- ✅ Admin dashboard with push notifications
+- ✅ Payment screenshot verification
+- ✅ Multiple copies and orientation support
+
+## 🤝 Contributing
+
+Contributions are welcome! Please follow these guidelines:
+
+1. **Test your changes** with actual printing
+2. **Update documentation** if adding features
+3. **Follow the modular structure** - use appropriate blueprints
+4. **Test printer compatibility** with `check_printer_options.py`
+
+## 📝 License
+
+This project is for educational and personal use.
+
 ---
 
-**Made with ❤️ for hassle-free printing | Real-Time Edition** 🖨️⚡✨
+**Made with ❤️ for hassle-free printing | Real-Time Color Edition** 🖨️⚡🎨✨

@@ -34,7 +34,8 @@
         {% for job in cart.jobs %}
         <!-- File Preview -->
         <div class="preview-item">
-          <form method="POST" action="{{ url_for('remove_from_cart_route', job_id=job.id) }}" style="display: inline">
+          <form method="POST" action="{{ url_for('user.remove_from_cart_route', job_id=job.id) }}"
+            style="display: inline">
             <button type="submit" class="remove-btn">×</button>
           </form>
           <div class="preview-placeholder" id="previewPlaceholder{{ loop.index }}">
@@ -78,7 +79,8 @@
     </div>
 
     <!-- Print Settings Form -->
-    <form action="{{ url_for('process_checkout') }}" method="POST" id="checkoutForm" data-cost-per-page="{{ 5.0 }}">
+    <form action="{{ url_for('user.process_checkout') }}" method="POST" id="checkoutForm"
+      data-cost-per-page="{{ 5.0 }}">
       <div class="settings-section">
         <div class="settings-header">
           <h2>Print settings</h2>
@@ -97,6 +99,48 @@
             {% endfor %}
             <button type="button" class="copies-btn" id="increaseBtn" onclick="changeCopies(1)">+</button>
           </div>
+        </div>
+
+        <!-- Print Color Mode -->
+        <div class="setting-group">
+          <label class="setting-label">Choose print colour</label>
+          <p class="setting-description">Save money with black & white or get color printouts</p>
+          <div class="orientation-options">
+            <div class="orientation-option">
+              <input type="radio" name="print_color_all" id="bw" value="bw" checked onclick="setColorAll('bw')" />
+              <label for="bw" class="orientation-label">
+                <div class="color-icon bw">
+                  <svg width="40" height="40" viewBox="0 0 40 40" fill="none">
+                    <circle cx="15" cy="20" r="8" fill="#333" opacity="0.8" />
+                    <circle cx="25" cy="20" r="8" fill="#666" opacity="0.6" />
+                  </svg>
+                </div>
+                <div style="display: flex; flex-direction: column; align-items: center;">
+                  <span class="orientation-name">B&W</span>
+                  <span style="font-size: 0.85rem; color: #666;">₹5/page</span>
+                </div>
+              </label>
+            </div>
+            <div class="orientation-option">
+              <input type="radio" name="print_color_all" id="color" value="color" onclick="setColorAll('color')" />
+              <label for="color" class="orientation-label">
+                <div class="color-icon color">
+                  <svg width="40" height="40" viewBox="0 0 40 40" fill="none">
+                    <circle cx="20" cy="14" r="6" fill="#00BCD4" />
+                    <circle cx="14" cy="23" r="6" fill="#E91E63" />
+                    <circle cx="26" cy="23" r="6" fill="#FFEB3B" />
+                  </svg>
+                </div>
+                <div style="display: flex; flex-direction: column; align-items: center;">
+                  <span class="orientation-name">Color</span>
+                  <span style="font-size: 0.85rem; color: #666;">₹5/page</span>
+                </div>
+              </label>
+            </div>
+          </div>
+          {% for job in cart.jobs %}
+          <input type="hidden" name="print_color_{{ job.id }}" class="color-input" value="bw" />
+          {% endfor %}
         </div>
 
         <!-- Print Orientation -->
@@ -207,6 +251,16 @@
       updateOrientationInDatabase(orientation);
     }
 
+    function setColorAll(colorMode) {
+      // Update all hidden color inputs
+      document.querySelectorAll('.color-input').forEach(input => {
+        input.value = colorMode;
+      });
+
+      // Update color mode in database via API
+      updateColorInDatabase(colorMode);
+    }
+
     async function updateOrientationInDatabase(newOrientation) {
       // Update all jobs in cart
       for (const job of cartData) {
@@ -227,6 +281,31 @@
       }
 
       // Refresh cart widget after orientation change
+      if (window.refreshCart) {
+        window.refreshCart();
+      }
+    }
+
+    async function updateColorInDatabase(newColorMode) {
+      // Update all jobs in cart
+      for (const job of cartData) {
+        try {
+          await fetch('/api/update-cart-item', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+              job_id: job.id,
+              print_color: newColorMode
+            })
+          });
+        } catch (error) {
+          console.error('Error updating color mode:', error);
+        }
+      }
+
+      // Refresh cart widget after color change
       if (window.refreshCart) {
         window.refreshCart();
       }

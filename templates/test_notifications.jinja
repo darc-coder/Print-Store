@@ -245,6 +245,16 @@
         // Initialize WebSocket on page load
         initializeWebSocket();
 
+        // Function to request subscription count from server
+        function updateSubscriptionCount() {
+            if (socket && socket.connected) {
+                socket.emit('request_subscription_status');
+                log('Requested subscription count from server', 'info');
+            } else {
+                log('Cannot update subscription count: WebSocket not connected', 'warning');
+            }
+        }
+
         // Check initial state
         if (!('serviceWorker' in navigator) || !('PushManager' in window)) {
             setStatus('❌ Your browser does not support push notifications', 'error');
@@ -323,7 +333,7 @@
                         log('Creating new push subscription...', 'info');
                         sub = await swRegistration.pushManager.subscribe({
                             userVisibleOnly: true,
-                            applicationServerKey: urlBase64ToUint8Array('BM0FyrpORkg9XWpZMf-eqGsDtjtF-OOB7D60LtmNsCfkpqqWopWkELvNSG1Vs3wUh_VRCxWiYZW3dpCCct1Mw9M')
+                            applicationServerKey: urlBase64ToUint8Array('{{ vapid_public_key }}')
                         });
                         log('New subscription created!', 'success');
                     } else {

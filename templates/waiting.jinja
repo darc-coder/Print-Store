@@ -29,7 +29,7 @@
                 <h1 class="page-title">📸 Upload Payment Screenshot</h1>
                 <p class="page-description">Upload screenshot of your payment confirmation to complete the order</p>
 
-                <form id="screenshotForm" method="POST" action="{{ url_for('submit_payment') }}"
+                <form id="screenshotForm" method="POST" action="{{ url_for('user.submit_payment') }}"
                     enctype="multipart/form-data">
                     {% for job_id in job_ids %}
                     <input type="hidden" name="job_ids[]" value="{{ job_id }}">
@@ -228,7 +228,7 @@
 
             try {
                 // Submit via AJAX
-                const response = await fetch('{{ url_for("submit_payment") }}', {
+                const response = await fetch('{{ url_for("user.submit_payment") }}', {
                     method: 'POST',
                     body: formData
                 });

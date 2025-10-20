@@ -24,7 +24,7 @@
                 🔔 Enable Notifications
             </button>
             <span class="admin-name">👤 {{ admin_username }}</span>
-            <a href="{{ url_for('admin_logout') }}" class="logout-btn">Logout</a>
+            <a href="{{ url_for('admin.logout') }}" class="logout-btn">Logout</a>
         </div>
     </div>
 
@@ -112,6 +112,11 @@
                             <span class="detail-label">📐 Orientation:</span>
                             <span class="detail-value">{{ job.orientation|capitalize }}</span>
                         </div>
+                        <div class="detail-row">
+                            <span class="detail-label">🎨 Color Mode:</span>
+                            <span class="detail-value">{{ 'Black & White' if job.print_color == 'bw' else 'Color'
+                                }}</span>
+                        </div>
                         {% if job.approved_by %}
                         <div class="detail-row">
                             <span class="detail-label">👤 Approved by:</span>
@@ -123,9 +128,9 @@
                     {% if job.payment_screenshot %}
                     <div class="screenshot-section">
                         <p class="screenshot-label">📸 Payment Screenshot:</p>
-                        <a href="{{ url_for('serve_screenshot', filename=job.payment_screenshot) }}" target="_blank"
-                            class="screenshot-link">
-                            <img src="{{ url_for('serve_screenshot', filename=job.payment_screenshot) }}"
+                        <a href="{{ url_for('user.serve_screenshot', filename=job.payment_screenshot) }}"
+                            target="_blank" class="screenshot-link">
+                            <img src="{{ url_for('user.serve_screenshot', filename=job.payment_screenshot) }}"
                                 alt="Payment Screenshot" class="screenshot-thumb">
                         </a>
                     </div>
@@ -134,12 +139,12 @@
 
                 {% if job.status == 'pending_approval' %}
                 <div class="job-actions">
-                    <form method="POST" action="{{ url_for('admin_approve', job_id=job.id) }}" style="display: inline;">
+                    <form method="POST" action="{{ url_for('admin.approve', job_id=job.id) }}" style="display: inline;">
                         <button type="submit" class="approve-btn">
                             ✓ Approve & Print
                         </button>
                     </form>
-                    <form method="POST" action="{{ url_for('admin_reject', job_id=job.id) }}" style="display: inline;">
+                    <form method="POST" action="{{ url_for('admin.reject', job_id=job.id) }}" style="display: inline;">
                         <button type="submit" class="reject-btn">
                             ✗ Reject
                         </button>
@@ -371,7 +376,7 @@
         // Check individual print status
         async function checkPrintStatus(jobId) {
             try {
-                const response = await fetch(`/api/update-print-status/${jobId}`, {
+                const response = await fetch(`/admin/update-print-status/${jobId}`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' }
                 });
