@@ -1,0 +1,136 @@
+/* Cart Button Widget Styles */
+.cart-button {
+  position: absolute;
+  top: 50%;
+  right: 2rem;
+  transform: translateY(-50%);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: linear-gradient(135deg, #4caf50 0%, #2e7d32 100%);
+  color: white;
+  border: none;
+  border-radius: 12px;
+  padding: 0.75rem 1.25rem;
+  font-family: inherit;
+  font-size: 0.95rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  box-shadow: 0 2px 8px rgba(46, 125, 50, 0.2);
+  z-index: 100;
+  white-space: nowrap;
+}
+
+.cart-button:hover:not(:disabled) {
+  transform: translateY(-50%) scale(1.05);
+  box-shadow: 0 4px 12px rgba(46, 125, 50, 0.3);
+}
+
+.cart-button:active:not(:disabled) {
+  transform: translateY(-50%) scale(0.98);
+}
+
+.cart-button:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.cart-button svg {
+  width: 24px;
+  height: 24px;
+  flex-shrink: 0;
+}
+
+.cart-count {
+  position: absolute;
+  top: -6px;
+  left: 12px;
+  background: #ff5722;
+  color: white;
+  border-radius: 50%;
+  width: 22px;
+  height: 22px;
+  display: none;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.75rem;
+  font-weight: 700;
+  border: 2px solid white;
+  animation: popIn 0.3s cubic-bezier(0.68, -0.55, 0.265, 1.55);
+}
+
+@keyframes popIn {
+  0% {
+    transform: scale(0);
+  }
+  50% {
+    transform: scale(1.2);
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+
+.cart-info {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  line-height: 1.2;
+}
+
+.cart-items {
+  font-size: 0.95rem;
+  opacity: 0.95;
+}
+
+.cart-price {
+  font-size: 1rem;
+  font-weight: 700;
+}
+
+/* Mobile responsive */
+@media (max-width: 768px) {
+  .cart-button {
+    right: 1rem;
+    padding: 0.6rem 1rem;
+    gap: 0.5rem;
+  }
+
+  .cart-button svg {
+    width: 20px;
+    height: 20px;
+  }
+
+  .cart-info {
+    display: none;
+  }
+
+  .cart-count {
+    left: 10px;
+    width: 20px;
+    height: 20px;
+    font-size: 0.7rem;
+  }
+}
+
+@media (max-width: 480px) {
+  .cart-button {
+    right: 0.5rem;
+    padding: 0.5rem 0.75rem;
+  }
+
+  .cart-count {
+    left: 8px;
+    width: 18px;
+    height: 18px;
+    font-size: 0.65rem;
+  }
+}
+
+/* Print styles - hide cart button when printing */
+@media print {
+  .cart-button {
+    display: none !important;
+  }
+}

@@ -1,0 +1,519 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Waiting for Approval - Print Store</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/common.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/waiting.css') }}">
+    <!-- Socket.IO Client -->
+    <script src="https://cdn.socket.io/4.5.4/socket.io.min.js"></script>
+</head>
+
+<body>
+    <!-- Header -->
+    <div class="header">
+        <img src="{{ url_for('static', filename='assets/nitzInc.png') }}" alt="NitzInc Logo" class="logo">
+        <div class="admin-status" id="adminStatus">
+            <span class="status-dot" id="statusDot">⚫</span>
+            <span class="status-text" id="statusText">Checking admin status...</span>
+        </div>
+    </div>
+
+    <!-- Main Container -->
+    <div class="waiting-container">
+        <div class="waiting-card" id="waitingCard">
+            <!-- Upload Screenshot Section -->
+            <div class="upload-section" id="uploadSection">
+                <h1 class="page-title">📸 Upload Payment Screenshot</h1>
+                <p class="page-description">Upload screenshot of your payment confirmation to complete the order</p>
+
+                <form id="screenshotForm" method="POST" action="{{ url_for('user.submit_payment') }}"
+                    enctype="multipart/form-data">
+                    {% for job_id in job_ids %}
+                    <input type="hidden" name="job_ids[]" value="{{ job_id }}">
+                    {% endfor %}
+
+                    <div class="upload-area" id="uploadArea"
+                        onclick="document.getElementById('screenshotInput').click()">
+                        <div class="upload-placeholder" id="uploadPlaceholder">
+                            <svg width="80" height="80" viewBox="0 0 24 24" fill="none" stroke="#9fa8da"
+                                stroke-width="2">
+                                <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
+                                <circle cx="8.5" cy="8.5" r="1.5"></circle>
+                                <polyline points="21 15 16 10 5 21"></polyline>
+                            </svg>
+                            <p class="upload-text">Click to select payment screenshot</p>
+                            <p class="upload-hint">JPG, PNG or any image format</p>
+                        </div>
+                        <div class="upload-preview" id="uploadPreview" style="display: none;">
+                            <img id="previewImg" src="" alt="Preview" class="preview-img">
+                            <button type="button" class="remove-preview-btn"
+                                onclick="event.stopPropagation(); removeScreenshot()">×</button>
+                        </div>
+                    </div>
+                    <input type="file" id="screenshotInput" name="screenshot" accept="image/*" capture="environment"
+                        class="hidden-file-input" onchange="handleScreenshotSelect(event)" required>
+
+                    <button type="submit" class="submit-screenshot-btn" id="submitBtn" disabled>
+                        ✓ Submit for Approval
+                    </button>
+                </form>
+
+                <div class="job-summary">
+                    <h3>Order Summary:</h3>
+                    <div class="summary-items">
+                        {% for job in jobs %}
+                        <div class="summary-row">
+                            <span>{{ job.filename }}</span>
+                            <span>{{ job.pages }} pages</span>
+                        </div>
+                        {% endfor %}
+                    </div>
+                    <div class="summary-total">
+                        <span>Total:</span>
+                        <span>₹{{ total_cost }}</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Waiting State -->
+            <!-- Waiting State -->
+            <div class="status-content" id="waitingState" style="display: none;">
+                <div class="waiting-spinner">
+                    <svg class="spinner" width="80" height="80" viewBox="0 0 24 24">
+                        <circle cx="12" cy="12" r="10" fill="none" stroke="#7986cb" stroke-width="2"
+                            stroke-linecap="round" stroke-dasharray="60" stroke-dashoffset="0">
+                            <animateTransform attributeName="transform" type="rotate" from="0 12 12" to="360 12 12"
+                                dur="1s" repeatCount="indefinite" />
+                        </circle>
+                    </svg>
+                </div>
+                <h1 class="status-title">⏳ Waiting for Approval</h1>
+                <p class="status-message">Payment submitted successfully!</p>
+                <p class="status-description">
+                    Our admin is reviewing your payment.<br>
+                    This usually takes 1-2 minutes.
+                </p>
+
+                <!-- Submitted Screenshot Preview -->
+                <div class="submitted-screenshot" id="submittedScreenshot" style="display: none;">
+                    <h3 style="font-size: 1rem; color: #666; margin-bottom: 0.5rem;">Submitted Screenshot:</h3>
+                    <img id="submittedScreenshotImg" src="" alt="Submitted screenshot"
+                        style="max-width: 100%; max-height: 300px; border-radius: 8px; margin-bottom: 1rem; border: 2px solid #e0e0e0;">
+                    <button type="button" onclick="replaceScreenshot()" class="replace-screenshot-btn">
+                        🔄 Replace Screenshot
+                    </button>
+                </div>
+
+                <div class="job-info">
+                    {% for job in jobs %}
+                    <div class="job-detail">
+                        <span class="detail-label">Job ID:</span>
+                        <span class="detail-value">#{{ job.id[:8] }}</span>
+                    </div>
+                    <div class="job-detail">
+                        <span class="detail-label">Files:</span>
+                        <span class="detail-value">{{ jobs|length }} file(s)</span>
+                    </div>
+                    <div class="job-detail">
+                        <span class="detail-label">Total Pages:</span>
+                        <span class="detail-value">{{ total_pages }}</span>
+                    </div>
+                    <div class="job-detail">
+                        <span class="detail-label">Amount:</span>
+                        <span class="detail-value">₹{{ total_cost }}</span>
+                    </div>
+                    {% endfor %}
+                </div>
+
+                <div class="refresh-info">
+                    <p>🔄 Updates will appear instantly via WebSocket...</p>
+                </div>
+
+                <!-- Resend Notification Button -->
+                <div class="resend-section">
+                    <button id="resendBtn" class="resend-btn" onclick="resendNotification()" disabled>
+                        <span id="resendText">🔔 Resend Notification</span>
+                        <span id="resendTimer" style="display: none;"></span>
+                    </button>
+                    <p class="resend-hint">Click to notify admin again if they haven't responded</p>
+                </div>
+            </div>
+
+            <!-- Approved State -->
+            <div class="status-content" id="approvedState" style="display: none;">
+                <div class="status-icon success-icon">
+                    <svg width="80" height="80" viewBox="0 0 24 24">
+                        <circle cx="12" cy="12" r="10" fill="#4caf50" stroke="#2e7d32" stroke-width="2" />
+                        <path d="M9 12l2 2 4-4" fill="none" stroke="white" stroke-width="2" stroke-linecap="round" />
+                    </svg>
+                </div>
+                <h1 class="status-title">✅ Payment Approved!</h1>
+                <p class="status-message">Your print job is now printing...</p>
+                <p class="status-description">
+                    Please collect your printouts from the counter.
+                </p>
+
+                <button onclick="window.location.href='/'" class="home-button">
+                    Go to Home
+                </button>
+            </div>
+
+            <!-- Rejected State -->
+            <div class="status-content" id="rejectedState" style="display: none;">
+                <div class="status-icon error-icon">
+                    <svg width="80" height="80" viewBox="0 0 24 24">
+                        <circle cx="12" cy="12" r="10" fill="#f44336" stroke="#d32f2f" stroke-width="2" />
+                        <path d="M15 9l-6 6M9 9l6 6" stroke="white" stroke-width="2" stroke-linecap="round" />
+                    </svg>
+                </div>
+                <h1 class="status-title">❌ Payment Rejected</h1>
+                <p class="status-message">Your payment could not be verified.</p>
+                <p class="status-description">
+                    Please contact the admin or try uploading a new screenshot.
+                </p>
+
+                <div class="rejected-actions"
+                    style="display: flex; gap: 1rem; justify-content: center; flex-wrap: wrap; margin-top: 2rem;">
+                    <button onclick="retryUploadScreenshot()" class="retry-upload-btn">
+                        📸 Upload New Screenshot
+                    </button>
+                    <button onclick="window.location.href='/'" class="home-button">
+                        🏠 Go to Home
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const jobIds = {{ job_ids | tojson | safe }};
+        let uploadedScreenshotUrl = null;
+
+        // Screenshot upload handling
+        function handleScreenshotSelect(event) {
+            const file = event.target.files[0];
+            if (file) {
+                const reader = new FileReader();
+                reader.onload = function (e) {
+                    document.getElementById('previewImg').src = e.target.result;
+                    document.getElementById('uploadPlaceholder').style.display = 'none';
+                    document.getElementById('uploadPreview').style.display = 'block';
+                    document.getElementById('submitBtn').disabled = false;
+                };
+                reader.readAsDataURL(file);
+            }
+        }
+
+        function removeScreenshot() {
+            document.getElementById('screenshotInput').value = '';
+            document.getElementById('previewImg').src = '';
+            document.getElementById('uploadPlaceholder').style.display = 'flex';
+            document.getElementById('uploadPreview').style.display = 'none';
+            document.getElementById('submitBtn').disabled = true;
+        }
+
+        // Form submission handling with AJAX
+        document.getElementById('screenshotForm').addEventListener('submit', async function (e) {
+            e.preventDefault(); // Prevent default form submission
+
+            const submitBtn = document.getElementById('submitBtn');
+            submitBtn.disabled = true;
+            submitBtn.textContent = '⏳ Submitting...';
+
+            // Create FormData from the form
+            const formData = new FormData(this);
+
+            try {
+                // Submit via AJAX
+                const response = await fetch('{{ url_for("user.submit_payment") }}', {
+                    method: 'POST',
+                    body: formData
+                });
+
+                if (response.ok) {
+                    // Store the uploaded screenshot for display in waiting state
+                    uploadedScreenshotUrl = document.getElementById('previewImg').src;
+
+                    // Hide upload section, show waiting
+                    document.getElementById('uploadSection').style.display = 'none';
+                    document.getElementById('waitingState').style.display = 'block';
+
+                    // Show the uploaded screenshot in waiting state
+                    if (uploadedScreenshotUrl) {
+                        document.getElementById('submittedScreenshotImg').src = uploadedScreenshotUrl;
+                        document.getElementById('submittedScreenshot').style.display = 'block';
+                    }
+
+                    // Reset resend button and timer
+                    const resendBtn = document.getElementById('resendBtn');
+                    resendBtn.disabled = true;
+                    document.getElementById('resendText').textContent = '🔔 Resend Notification';
+                    document.getElementById('resendText').style.display = 'inline';
+                    document.getElementById('resendTimer').style.display = 'none';
+
+                    // Clear any existing resend timer
+                    if (resendTimer) {
+                        clearInterval(resendTimer);
+                        resendTimer = null;
+                    }
+                    resendCooldown = 0;
+
+                    // Enable resend button after 30 seconds
+                    setTimeout(() => {
+                        if (resendBtn) {
+                            resendBtn.disabled = false;
+                        }
+                    }, 30000);
+
+                    // WebSocket will handle status updates automatically
+                    // No need for polling - Socket.IO has built-in fallback
+                } else {
+                    alert('Failed to submit screenshot. Please try again.');
+                    submitBtn.disabled = false;
+                    submitBtn.textContent = '✓ Submit for Approval';
+                }
+            } catch (error) {
+                console.error('Error submitting screenshot:', error);
+                alert('Failed to submit screenshot. Please try again.');
+                submitBtn.disabled = false;
+                submitBtn.textContent = '✓ Submit for Approval';
+            }
+        });
+
+        // Function to go back to upload section (replace screenshot)
+        function replaceScreenshot() {
+            // Show upload section, hide waiting
+            document.getElementById('waitingState').style.display = 'none';
+            document.getElementById('uploadSection').style.display = 'block';
+
+            // Remove required attribute since screenshot already exists on backend
+            const screenshotInput = document.getElementById('screenshotInput');
+            screenshotInput.removeAttribute('required');
+
+            // Keep the existing screenshot preview
+            if (uploadedScreenshotUrl) {
+                document.getElementById('previewImg').src = uploadedScreenshotUrl;
+                document.getElementById('uploadPlaceholder').style.display = 'none';
+                document.getElementById('uploadPreview').style.display = 'block';
+                document.getElementById('submitBtn').disabled = false;
+                document.getElementById('submitBtn').textContent = '✓ Re-Submit for Approval';
+            }
+        }
+
+        // Function to retry upload from rejected state
+        function retryUploadScreenshot() {
+            // Hide rejected state, show upload section
+            document.getElementById('rejectedState').style.display = 'none';
+            document.getElementById('uploadSection').style.display = 'block';
+
+            // Clear any existing screenshot preview
+            const screenshotInput = document.getElementById('screenshotInput');
+            screenshotInput.value = '';
+            screenshotInput.setAttribute('required', 'required'); // Re-add required for fresh upload
+
+            document.getElementById('previewImg').src = '';
+            document.getElementById('uploadPlaceholder').style.display = 'flex';
+            document.getElementById('uploadPreview').style.display = 'none';
+            document.getElementById('submitBtn').disabled = true;
+            document.getElementById('submitBtn').textContent = '✓ Submit for Approval';
+
+            // Reset uploaded screenshot URL
+            uploadedScreenshotUrl = null;
+        }
+
+        // Check admin status via WebSocket
+        let socket = null;
+
+        function initializeWebSocket() {
+            const statusDot = document.getElementById('statusDot');
+            const statusText = document.getElementById('statusText');
+
+            console.log('🔌 Connecting to WebSocket server...');
+            socket = io();
+
+            socket.on('connect', () => {
+                console.log('✅ WebSocket connected');
+                // Don't set status text here - wait for subscription_status_update event
+            });
+
+            socket.on('disconnect', () => {
+                console.log('❌ WebSocket disconnected');
+                statusDot.textContent = '⚫';
+                statusDot.className = 'status-dot offline';
+                statusText.textContent = 'Connection lost...';
+            });
+
+            socket.on('subscription_status_update', (data) => {
+                console.log('📡 Received subscription status update:', data);
+                updateAdminStatus(data.count);
+            });
+
+            // Listen for job status updates
+            socket.on('job_status_update', (data) => {
+                console.log('📡 Received job status update:', data);
+                handleJobStatusUpdate(data);
+            });
+        }
+
+        function handleJobStatusUpdate(data) {
+            const { job_id, status, action } = data;
+
+            // Check if this update is for one of our jobs
+            if (!jobIds.includes(job_id)) {
+                return; // Not our job, ignore
+            }
+
+            console.log(`📊 Job ${job_id} status changed to: ${status} (${action})`);
+
+            // Handle based on status
+            if (status === 'printing' || status === 'completed') {
+                // Job approved - redirect to success page
+                console.log('✅ Job approved! Redirecting to success page...');
+                window.location.href = '/success?job_ids=' + jobIds.join(',');
+            } else if (status === 'rejected') {
+                // Job rejected - show rejected state
+                console.log('❌ Job rejected! Showing rejection message...');
+                document.getElementById('waitingState').style.display = 'none';
+                document.getElementById('rejectedState').style.display = 'block';
+            }
+        }
+
+        function updateAdminStatus(count) {
+            const statusDot = document.getElementById('statusDot');
+            const statusText = document.getElementById('statusText');
+
+            if (count > 0) {
+                statusDot.textContent = '🟢';
+                statusDot.className = 'status-dot online';
+                statusText.textContent = `Admin online (${count} device${count > 1 ? 's' : ''})`;
+            } else {
+                statusDot.textContent = '⚫';
+                statusDot.className = 'status-dot offline';
+                statusText.textContent = 'Admin offline';
+            }
+        }
+
+        // Initialize WebSocket on page load
+        initializeWebSocket();
+
+        // Check for existing screenshot on page load
+        async function checkExistingScreenshot() {
+            try {
+                const response = await fetch('/api/get-screenshot', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ job_ids: jobIds })
+                });
+
+                const data = await response.json();
+
+                if (data.has_screenshot) {
+                    // Screenshot already exists, show waiting state
+                    uploadedScreenshotUrl = data.screenshot_url;
+
+                    document.getElementById('uploadSection').style.display = 'none';
+                    document.getElementById('waitingState').style.display = 'block';
+
+                    // Show the existing screenshot
+                    document.getElementById('submittedScreenshotImg').src = data.screenshot_url;
+                    document.getElementById('submittedScreenshot').style.display = 'block';
+
+                    // WebSocket will handle status updates automatically
+                    // No need for polling - Socket.IO has built-in fallback
+
+                    // Enable resend button after 30 seconds
+                    setTimeout(() => {
+                        document.getElementById('resendBtn').disabled = false;
+                    }, 30000);
+                }
+            } catch (error) {
+                console.error('Error checking existing screenshot:', error);
+            }
+        }
+
+        // Check on page load
+        checkExistingScreenshot();
+
+        // Resend notification functionality
+        let resendCooldown = 0;
+        let resendTimer = null;
+        const COOLDOWN_SECONDS = 300; // 5 minutes
+
+        function updateResendButton() {
+            const resendBtn = document.getElementById('resendBtn');
+            const resendText = document.getElementById('resendText');
+            const resendTimerSpan = document.getElementById('resendTimer');
+
+            if (resendCooldown > 0) {
+                resendBtn.disabled = true;
+                resendText.style.display = 'none';
+                resendTimerSpan.style.display = 'inline';
+
+                const minutes = Math.floor(resendCooldown / 60);
+                const seconds = resendCooldown % 60;
+                resendTimerSpan.textContent = `⏱️ Wait ${minutes}:${seconds.toString().padStart(2, '0')}`;
+
+                resendCooldown--;
+            } else {
+                resendBtn.disabled = false;
+                resendText.style.display = 'inline';
+                resendTimerSpan.style.display = 'none';
+                if (resendTimer) {
+                    clearInterval(resendTimer);
+                    resendTimer = null;
+                }
+            }
+        }
+
+        function startResendCooldown() {
+            resendCooldown = COOLDOWN_SECONDS;
+            updateResendButton();
+            resendTimer = setInterval(updateResendButton, 1000);
+        }
+
+        async function resendNotification() {
+            const resendBtn = document.getElementById('resendBtn');
+            const resendText = document.getElementById('resendText');
+            const resendTimerSpan = document.getElementById('resendTimer');
+
+            try {
+                resendBtn.disabled = true;
+                resendText.textContent = '📤 Sending...';
+
+                const jobIds = [{% for job in jobs %}'{{ job.id }}'{% if not loop.last %}, {% endif %} {% endfor %}];
+
+            const response = await fetch('/api/resend-notification', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ job_ids: jobIds })
+            });
+
+            const data = await response.json();
+
+            if (response.ok) {
+                alert('✅ Notification sent to admin!');
+                startResendCooldown();
+            } else {
+                throw new Error(data.error || 'Failed to send notification');
+            }
+        } catch (error) {
+            console.error('Error sending notification:', error);
+            alert('❌ Failed to send notification: ' + error.message);
+            resendBtn.disabled = false;
+            resendText.style.display = 'inline';
+            resendText.textContent = '🔔 Resend Notification';
+            resendTimerSpan.style.display = 'none';
+        }
+        }
+
+        // Enable resend button after 30 seconds (initial grace period)
+        setTimeout(() => {
+            document.getElementById('resendBtn').disabled = false;
+        }, 30000);
+    </script>
+</body>
+
+</html>

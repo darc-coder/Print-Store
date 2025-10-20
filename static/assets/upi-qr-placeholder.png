@@ -1,0 +1,35 @@
+<svg width="300" height="360" xmlns="http://www.w3.org/2000/svg">
+  <!-- Background -->
+  <rect width="300" height="360" fill="#ffffff"/>
+  
+  <!-- QR Code Placeholder -->
+  <rect x="25" y="25" width="250" height="250" fill="#f5f7ff" stroke="#5c6bc0" stroke-width="2" rx="8"/>
+  
+  <!-- QR Icon -->
+  <g transform="translate(150, 150)">
+    <rect x="-50" y="-50" width="40" height="40" fill="#5c6bc0"/>
+    <rect x="10" y="-50" width="40" height="40" fill="#5c6bc0"/>
+    <rect x="-50" y="10" width="40" height="40" fill="#5c6bc0"/>
+    <rect x="10" y="10" width="40" height="40" fill="#5c6bc0"/>
+    
+    <rect x="-35" y="-35" width="10" height="10" fill="#ffffff"/>
+    <rect x="25" y="-35" width="10" height="10" fill="#ffffff"/>
+    <rect x="-35" y="25" width="10" height="10" fill="#ffffff"/>
+    <rect x="25" y="25" width="10" height="10" fill="#ffffff"/>
+    
+    <rect x="-15" y="-15" width="30" height="5" fill="#5c6bc0"/>
+    <rect x="-15" y="-5" width="5" height="30" fill="#5c6bc0"/>
+    <rect x="10" y="5" width="5" height="10" fill="#5c6bc0"/>
+  </g>
+  
+  <!-- Text -->
+  <text x="150" y="300" text-anchor="middle" font-family="Arial, sans-serif" font-size="16" font-weight="bold" fill="#333">
+    UPI QR Code
+  </text>
+  <text x="150" y="325" text-anchor="middle" font-family="Arial, sans-serif" font-size="14" fill="#666">
+    nitzme@ybl
+  </text>
+  <text x="150" y="345" text-anchor="middle" font-family="Arial, sans-serif" font-size="12" fill="#999">
+    Replace with your actual QR code
+  </text>
+</svg>

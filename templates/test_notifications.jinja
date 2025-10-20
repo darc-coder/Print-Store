@@ -1,0 +1,451 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Push Notification Tester</title>
+    <!-- Socket.IO Client -->
+    <script src="https://cdn.socket.io/4.5.4/socket.io.min.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+        }
+
+        .container {
+            background: white;
+            border-radius: 16px;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+            max-width: 600px;
+            width: 100%;
+            padding: 40px;
+        }
+
+        h1 {
+            color: #333;
+            margin-bottom: 10px;
+            font-size: 28px;
+        }
+
+        .subtitle {
+            color: #666;
+            margin-bottom: 30px;
+            font-size: 14px;
+        }
+
+        .subscription-info {
+            text-align: center;
+            margin-bottom: 20px;
+        }
+
+        .subscription-badge {
+            display: inline-block;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 10px 20px;
+            border-radius: 20px;
+            font-size: 14px;
+            font-weight: 500;
+            box-shadow: 0 4px 12px rgba(102, 126, 234, 0.3);
+        }
+
+        .subscription-badge strong {
+            font-size: 18px;
+            font-weight: 700;
+        }
+
+        .status {
+            padding: 15px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            font-size: 14px;
+        }
+
+        .status.info {
+            background: #e3f2fd;
+            color: #1976d2;
+            border-left: 4px solid #1976d2;
+        }
+
+        .status.success {
+            background: #e8f5e9;
+            color: #388e3c;
+            border-left: 4px solid #388e3c;
+        }
+
+        .status.error {
+            background: #ffebee;
+            color: #d32f2f;
+            border-left: 4px solid #d32f2f;
+        }
+
+        .status.warning {
+            background: #fff3e0;
+            color: #f57c00;
+            border-left: 4px solid #f57c00;
+        }
+
+        button {
+            width: 100%;
+            padding: 16px;
+            font-size: 16px;
+            font-weight: 600;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.3s;
+            margin-bottom: 12px;
+        }
+
+        button:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        .btn-primary {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+        }
+
+        .btn-primary:hover:not(:disabled) {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 20px rgba(102, 126, 234, 0.4);
+        }
+
+        .btn-secondary {
+            background: #f5f5f5;
+            color: #333;
+        }
+
+        .btn-secondary:hover:not(:disabled) {
+            background: #e0e0e0;
+        }
+
+        .log {
+            background: #1e1e1e;
+            color: #d4d4d4;
+            padding: 15px;
+            border-radius: 8px;
+            font-family: 'Courier New', monospace;
+            font-size: 13px;
+            max-height: 300px;
+            overflow-y: auto;
+            margin-top: 20px;
+        }
+
+        .log-entry {
+            margin-bottom: 5px;
+            word-wrap: break-word;
+        }
+
+        .log-success {
+            color: #4caf50;
+        }
+
+        .log-error {
+            color: #f44336;
+        }
+
+        .log-warning {
+            color: #ff9800;
+        }
+
+        .log-info {
+            color: #2196f3;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="container">
+        <h1>🔔 Push Notification Tester</h1>
+        <p class="subtitle">Test your push notification setup</p>
+
+        <div class="subscription-info">
+            <span id="subscriptionCount" class="subscription-badge">
+                📊 Active Subscriptions: <strong id="countValue">0</strong>
+            </span>
+        </div>
+
+        <div id="statusBox" class="status info">
+            ℹ️ Click "Enable Notifications" to get started
+        </div>
+
+        <button id="enableBtn" class="btn-primary">
+            🔔 Enable Notifications
+        </button>
+
+        <button id="testBtn" class="btn-secondary" disabled>
+            🧪 Send Test Notification
+        </button>
+
+        <div class="log" id="logBox">
+            <div class="log-entry log-info">📝 Logs will appear here...</div>
+        </div>
+    </div>
+
+    <script>
+        const statusBox = document.getElementById('statusBox');
+        const enableBtn = document.getElementById('enableBtn');
+        const testBtn = document.getElementById('testBtn');
+        const logBox = document.getElementById('logBox');
+        const countValue = document.getElementById('countValue');
+
+        let subscription = null;
+        let swRegistration = null;
+
+        function log(message, type = 'info') {
+            const entry = document.createElement('div');
+            entry.className = `log-entry log-${type}`;
+            const timestamp = new Date().toLocaleTimeString();
+            entry.textContent = `[${timestamp}] ${message}`;
+            logBox.appendChild(entry);
+            logBox.scrollTop = logBox.scrollHeight;
+        }
+
+        function setStatus(message, type) {
+            statusBox.className = `status ${type}`;
+            statusBox.innerHTML = message;
+        }
+
+        // Fetch subscription count via WebSocket
+        let socket = null;
+
+        function initializeWebSocket() {
+            console.log('🔌 Connecting to WebSocket...');
+            socket = io();
+
+            socket.on('connect', () => {
+                log('✅ WebSocket connected', 'success');
+            });
+
+            socket.on('disconnect', () => {
+                log('❌ WebSocket disconnected', 'warning');
+            });
+
+            socket.on('subscription_status_update', (data) => {
+                console.log('📡 Subscription status update:', data);
+                countValue.textContent = data.count;
+                log(`Server has ${data.count} active subscription(s)`, 'info');
+            });
+        }
+
+        // Initialize WebSocket on page load
+        initializeWebSocket();
+
+        // Function to request subscription count from server
+        function updateSubscriptionCount() {
+            if (socket && socket.connected) {
+                socket.emit('request_subscription_status');
+                log('Requested subscription count from server', 'info');
+            } else {
+                log('Cannot update subscription count: WebSocket not connected', 'warning');
+            }
+        }
+
+        // Check initial state
+        if (!('serviceWorker' in navigator) || !('PushManager' in window)) {
+            setStatus('❌ Your browser does not support push notifications', 'error');
+            enableBtn.disabled = true;
+            log('Browser does not support service workers or push notifications', 'error');
+        } else {
+            log('Browser supports push notifications', 'success');
+
+            // Register service worker first (force update)
+            navigator.serviceWorker.register('/sw.js').then(registration => {
+                log('Service worker registered', 'success');
+                log('SW scope: ' + registration.scope, 'info');
+                log('SW URL: ' + (registration.active ? registration.active.scriptURL : 'not active yet'), 'info');
+                swRegistration = registration;
+
+                // Force update check
+                registration.update().then(() => {
+                    log('Service worker update check complete', 'success');
+                }).catch(err => {
+                    log('Service worker update check failed: ' + err.message, 'warning');
+                });
+
+                // Check if already subscribed
+                return navigator.serviceWorker.ready;
+            }).then(registration => {
+                return registration.pushManager.getSubscription();
+            }).then(sub => {
+                if (sub) {
+                    subscription = sub;
+                    setStatus('✅ Notifications are enabled!', 'success');
+                    enableBtn.textContent = '🔄 Re-Enable Notifications';
+                    enableBtn.disabled = false; // Allow re-enabling in case server restarted
+                    testBtn.disabled = false;
+                    log('Already subscribed to push notifications', 'success');
+                    log('Note: If server restarted, click "Re-Enable Notifications" or just try sending test', 'warning');
+                } else {
+                    log('No existing subscription found. Click "Enable Notifications" to subscribe.', 'info');
+                    setStatus('ℹ️ Click "Enable Notifications" to get started', 'info');
+                }
+            }).catch(error => {
+                log(`Error checking subscription: ${error.message}`, 'error');
+                setStatus('⚠️ Error checking subscription status', 'warning');
+            });
+        }
+
+        enableBtn.addEventListener('click', async function () {
+            // Prevent double-clicking
+            if (enableBtn.disabled) return;
+            enableBtn.disabled = true;
+
+            try {
+                log('Checking notification permission...', 'info');
+                setStatus('⏳ Setting up notifications...', 'info');
+
+                // Check if already granted
+                let permission = Notification.permission;
+
+                if (permission !== 'granted') {
+                    log('Requesting notification permission...', 'info');
+                    permission = await Notification.requestPermission();
+                    log(`Permission result: ${permission}`, permission === 'granted' ? 'success' : 'warning');
+                }
+
+                if (permission === 'granted') {
+                    // Use existing registration or wait for it
+                    if (!swRegistration) {
+                        log('Waiting for service worker...', 'info');
+                        swRegistration = await navigator.serviceWorker.ready;
+                    }
+                    log('Service worker is ready', 'success');
+
+                    // Get existing subscription or create new one
+                    let sub = await swRegistration.pushManager.getSubscription();
+
+                    if (!sub) {
+                        log('Creating new push subscription...', 'info');
+                        sub = await swRegistration.pushManager.subscribe({
+                            userVisibleOnly: true,
+                            applicationServerKey: urlBase64ToUint8Array('{{ vapid_public_key }}')
+                        });
+                        log('New subscription created!', 'success');
+                    } else {
+                        log('Using existing subscription', 'success');
+                    }
+
+                    subscription = sub;
+
+                    // Send subscription to server
+                    log('Registering subscription with server...', 'info');
+                    const response = await fetch('/admin/subscribe', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(subscription)
+                    });
+
+                    if (response.ok) {
+                        log('Subscription registered on server', 'success');
+                        setStatus('✅ Notifications enabled successfully!', 'success');
+                        enableBtn.textContent = '✅ Notifications Enabled';
+                        testBtn.disabled = false;
+                        log('✅ All done! You can now send test notifications.', 'success');
+
+                        // Update subscription count
+                        updateSubscriptionCount();
+                    } else {
+                        throw new Error('Failed to save subscription on server');
+                    }
+                } else {
+                    setStatus('❌ Permission denied. Please allow notifications in browser settings.', 'error');
+                    log('Notification permission denied', 'error');
+                    enableBtn.disabled = false;
+                }
+            } catch (error) {
+                log(`Error: ${error.message}`, 'error');
+                setStatus('❌ Failed to enable notifications', 'error');
+                console.error(error);
+                enableBtn.disabled = false;
+            }
+        });
+
+        testBtn.addEventListener('click', async function () {
+            try {
+                log('Sending test notification via server...', 'info');
+                setStatus('⏳ Sending test notification...', 'info');
+
+                // Get fresh subscription from service worker
+                if (!swRegistration) {
+                    log('Service worker not ready, waiting...', 'warning');
+                    swRegistration = await navigator.serviceWorker.ready;
+                }
+
+                const currentSubscription = await swRegistration.pushManager.getSubscription();
+
+                if (!currentSubscription) {
+                    throw new Error('No active subscription found. Please click "Enable Notifications" first.');
+                }
+
+                // Update our subscription variable
+                subscription = currentSubscription;
+
+                // Ensure subscription is registered on server (in case server restarted)
+                log('Registering subscription with server...', 'info');
+                const subResponse = await fetch('/admin/subscribe', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(subscription)
+                });
+
+                if (!subResponse.ok) {
+                    log('Warning: Failed to register subscription with server', 'warning');
+                } else {
+                    // Update subscription count after re-registering
+                    updateSubscriptionCount();
+                }
+
+                log('Sending notification...', 'info');
+                const response = await fetch('/api/test-notification', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        title: '🧪 Test Notification',
+                        body: 'Your push notifications are working perfectly! 🎉'
+                    })
+                });
+
+                if (response.ok) {
+                    log('Test notification sent!', 'success');
+                    setStatus('✅ Test notification sent! Check your notifications.', 'success');
+                    log('Tip: Minimize this window to see the notification', 'warning');
+                } else {
+                    const errorData = await response.json();
+                    throw new Error(errorData.error || 'Server returned error');
+                }
+            } catch (error) {
+                log(`Error sending test: ${error.message}`, 'error');
+                setStatus('❌ ' + error.message, 'error');
+            }
+        });
+
+        // Helper function
+        function urlBase64ToUint8Array(base64String) {
+            const padding = '='.repeat((4 - base64String.length % 4) % 4);
+            const base64 = (base64String + padding).replace(/-/g, '+').replace(/_/g, '/');
+            const rawData = window.atob(base64);
+            const outputArray = new Uint8Array(rawData.length);
+            for (let i = 0; i < rawData.length; ++i) {
+                outputArray[i] = rawData.charCodeAt(i);
+            }
+            return outputArray;
+        }
+    </script>
+</body>
+
+</html>

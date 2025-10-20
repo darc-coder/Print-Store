@@ -1,0 +1,303 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Success - Print Store</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/common.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/success.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/cart-widget.css') }}">
+    <script src="https://cdn.socket.io/4.5.4/socket.io.min.js"></script>
+</head>
+
+<body>
+    <!-- Header -->
+    <div class="header">
+        <img src="{{ url_for('static', filename='assets/nitzInc.png') }}" alt="NitzInc Logo" class="logo">
+    </div>
+
+    <!-- Main Container -->
+    <div class="success-container">
+        <div class="success-card">
+            <!-- Success Icon with Animation -->
+            <div class="success-icon-wrapper">
+                <svg class="success-icon" width="100" height="100" viewBox="0 0 24 24">
+                    <circle class="success-circle" cx="12" cy="12" r="10" fill="#4caf50" stroke="#2e7d32"
+                        stroke-width="2" />
+                    <path class="success-check" d="M9 12l2 2 4-4" fill="none" stroke="white" stroke-width="2.5"
+                        stroke-linecap="round" stroke-linejoin="round" />
+                </svg>
+            </div>
+
+            <!-- Success Message -->
+            <h1 class="success-title">✅ Payment Approved!</h1>
+            <p class="success-message">Your print job has been approved and sent to the printer.</p>
+
+            <!-- Order ID Section -->
+            <div class="order-id-section">
+                {% if jobs|length == 1 %}
+                <div class="order-id-label">Job ID:</div>
+                <div class="order-id-value">#{{ jobs[0].id[:8] }}</div>
+                {% else %}
+                <div class="order-id-label">Job IDs:</div>
+                <div class="order-id-value">
+                    {% for job in jobs %}
+                    #{{ job.id[:8] }}{% if not loop.last %}, {% endif %}
+                    {% endfor %}
+                </div>
+                {% endif %}
+            </div>
+
+            <p class="success-description">
+                Please collect your printouts from the counter.
+            </p>
+
+            <!-- Order Details -->
+            <div class="order-details">
+                <h3 class="details-heading">Order Details</h3>
+                <div class="details-grid">
+                    <div class="detail-item">
+                        <span class="detail-label">📄 Files</span>
+                        <span class="detail-value">{{ jobs|length }} file(s)</span>
+                    </div>
+                    <div class="detail-item">
+                        <span class="detail-label">📋 Total Pages</span>
+                        <span class="detail-value">{{ total_pages }} pages</span>
+                    </div>
+                    <div class="detail-item">
+                        <span class="detail-label">💰 Amount Paid</span>
+                        <span class="detail-value">₹{{ total_cost }}</span>
+                    </div>
+                    <div class="detail-item">
+                        <span class="detail-label">📦 Copies</span>
+                        <span class="detail-value">{{ jobs[0].copies if jobs else 1 }} set(s)</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Files List -->
+            <div class="files-printed">
+                <h4 class="files-heading">Files Status:</h4>
+                <div class="files-list" id="filesListContainer">
+                    {% for job in jobs %}
+                    <div class="file-entry" data-job-id="{{ job.id }}">
+                        <span class="file-icon">📄</span>
+                        <div class="file-info">
+                            <div class="file-name">{{ job.filename }}</div>
+                            <div class="file-meta">{{ job.pages }} pages × {{ job.copies }} copies</div>
+                        </div>
+                        <div class="file-status">
+                            <span class="status-badge" id="status-{{ job.id }}">{{ job.status }}</span>
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+
+            <!-- Action Buttons -->
+            <div class="action-buttons">
+                <button onclick="window.location.href='/'" class="home-btn">
+                    🏠 Back to Home
+                </button>
+                <button onclick="window.print()" class="receipt-btn">
+                    🧾 Print Receipt
+                </button>
+            </div>
+
+            <!-- Thank You Message -->
+            <div class="thank-you">
+                <p>Thank you for using <strong>NitzInK Print Store</strong>! 🎉</p>
+                <p class="small-text">Your order will be ready in approximately 2-3 minutes.</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- Confetti Animation -->
+    <div class="confetti-container" id="confettiContainer"></div>
+
+    <script src="{{ url_for('static', filename='js/cart-widget.js') }}"></script>
+    <script>
+        // Job IDs from server
+        const jobIds = [{% for job in jobs %}'{{ job.id }}'{% if not loop.last %}, {% endif %} {% endfor %}];
+        let allCompleted = false;
+        let socket = null;
+
+        // Status display configuration with emoji, text, and CSS classes
+        const statusConfig = {
+            'printing': {
+                icon: '🖨️',
+                text: 'Printing',
+                class: 'printing'
+            },
+            'completed': {
+                icon: '✅',
+                text: 'Completed',
+                class: 'completed'
+            },
+            'pending': {
+                icon: '⏳',
+                text: 'Pending',
+                class: 'pending'
+            },
+            'pending_approval': {
+                icon: '⏳',
+                text: 'Pending Approval',
+                class: 'pending'
+            },
+            'error': {
+                icon: '❌',
+                text: 'Error',
+                class: 'error'
+            },
+            'rejected': {
+                icon: '❌',
+                text: 'Rejected',
+                class: 'error'
+            },
+            'refunded': {
+                icon: '💰',
+                text: 'Refunded',
+                class: 'refunded'
+            }
+        };
+
+        // Format and update status badge with emoji, text, and styling
+        function updateStatusBadge(jobId, status) {
+            const badge = document.getElementById(`status-${jobId}`);
+            if (badge) {
+                // Get config for this status, or create default for unknown status
+                const config = statusConfig[status] || {
+                    icon: '',
+                    text: status.charAt(0).toUpperCase() + status.slice(1).replace(/_/g, ' '),
+                    class: 'unknown'
+                };
+
+                // Update badge content and styling
+                badge.textContent = config.icon ? `${config.icon} ${config.text}` : config.text;
+                badge.className = `status-badge ${config.class}`;
+
+                console.log(`✅ Updated badge for ${jobId}: ${config.icon} ${config.text} (${config.class})`);
+            }
+        }
+
+        // Initialize all status badges on page load with current status
+        function initializeStatusBadges() {
+            console.log('🎨 Initializing status badges...');
+            {% for job in jobs %}
+            updateStatusBadge('{{ job.id }}', '{{ job.status }}');
+            {% endfor %}
+        }
+
+        // Check if all jobs are completed
+        async function checkAllJobsCompleted() {
+            try {
+                let completedCount = 0;
+
+                for (const jobId of jobIds) {
+                    const response = await fetch(`/api/job-status/${jobId}`);
+                    if (response.ok) {
+                        const data = await response.json();
+
+                        // Update badge with current status
+                        updateStatusBadge(jobId, data.status);
+
+                        if (data.status === 'completed') {
+                            completedCount++;
+                        }
+                    }
+                }
+
+                // If all jobs are completed
+                if (completedCount === jobIds.length && !allCompleted) {
+                    allCompleted = true;
+                    console.log('✅ All jobs completed!');
+
+                    // Update success message
+                    document.querySelector('.success-title').textContent = '✅ All Jobs Completed!';
+                    document.querySelector('.success-message').textContent = 'Your printouts are ready for collection!';
+                    document.querySelector('.files-heading').textContent = 'Completed Files:';
+
+                    // Show celebration
+                    createConfetti();
+                }
+            } catch (error) {
+                console.error('Error checking job completion:', error);
+            }
+        }
+
+        // Initialize WebSocket connection
+        function initializeWebSocket() {
+            console.log('🔌 Connecting to WebSocket...');
+
+            socket = io({
+                reconnection: true,
+                reconnectionDelay: 1000,
+                reconnectionAttempts: 5
+            });
+
+            socket.on('connect', () => {
+                console.log('✅ WebSocket connected');
+            });
+
+            socket.on('disconnect', () => {
+                console.log('❌ WebSocket disconnected');
+            });
+
+            // Listen for job status updates
+            socket.on('job_status_update', (data) => {
+                console.log('📡 Received job update:', data);
+
+                // Check if this update is for one of our jobs
+                if (jobIds.includes(data.job_id)) {
+                    console.log(`📊 Updating job ${data.job_id} to status: ${data.status}`);
+                    updateStatusBadge(data.job_id, data.status);
+
+                    // Check if all jobs are now completed
+                    checkAllJobsCompleted();
+                }
+            });
+        }
+
+        // Confetti animation
+        function createConfetti() {
+            const container = document.getElementById('confettiContainer');
+            container.innerHTML = ''; // Clear existing
+            const colors = ['#4caf50', '#2e7d32', '#81c784', '#66bb6a', '#a5d6a7'];
+
+            for (let i = 0; i < 50; i++) {
+                const confetti = document.createElement('div');
+                confetti.className = 'confetti';
+                confetti.style.left = Math.random() * 100 + '%';
+                confetti.style.backgroundColor = colors[Math.floor(Math.random() * colors.length)];
+                confetti.style.animationDelay = Math.random() * 3 + 's';
+                confetti.style.animationDuration = (Math.random() * 3 + 2) + 's';
+                container.appendChild(confetti);
+            }
+
+            // Remove confetti after animation
+            setTimeout(() => {
+                container.innerHTML = '';
+            }, 5000);
+        }
+
+        // Run confetti on page load
+        window.addEventListener('load', () => {
+            createConfetti();
+            initializeStatusBadges(); // Initialize status badges with formatting
+        });
+
+        // Initialize WebSocket on page load
+        initializeWebSocket();
+
+        // Check initial completion status on load
+        checkAllJobsCompleted();
+
+        // Auto-redirect to home after 2 minutes
+        setTimeout(() => {
+            window.location.href = '/';
+        }, 120000);
+    </script>
+</body>
+
+</html>

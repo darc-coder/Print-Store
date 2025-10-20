@@ -1,0 +1,74 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Admin Login - Print Store</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/common.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/admin.css') }}">
+</head>
+
+<body>
+    <!-- Header -->
+    <div class="header">
+        <img src="{{ url_for('static', filename='assets/nitzInc.png') }}" alt="NitzInc Logo" class="logo">
+    </div>
+
+    <!-- Main Container -->
+    <div class="login-container">
+        <div class="login-card">
+            <div class="login-icon">
+                <svg width="60" height="60" viewBox="0 0 24 24" fill="none" stroke="#5c6bc0" stroke-width="2">
+                    <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path>
+                    <circle cx="12" cy="7" r="4"></circle>
+                </svg>
+            </div>
+
+            <h1 class="login-title">Admin Login</h1>
+            <p class="login-subtitle">Access Print Queue Management</p>
+
+            {% if error %}
+            <div class="error-message">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <circle cx="12" cy="12" r="10"></circle>
+                    <line x1="12" y1="8" x2="12" y2="12"></line>
+                    <line x1="12" y1="16" x2="12.01" y2="16"></line>
+                </svg>
+                {{ error }}
+            </div>
+            {% endif %}
+
+            <form method="POST" action="{{ url_for('admin.login') }}" class="login-form">
+                <div class="form-group">
+                    <label for="username" class="form-label">Username</label>
+                    <input type="text" id="username" name="username" class="form-input"
+                        placeholder="Enter your username" required autofocus>
+                </div>
+
+                <div class="form-group">
+                    <label for="password" class="form-label">Password</label>
+                    <input type="password" id="password" name="password" class="form-input"
+                        placeholder="Enter your password" required>
+                </div>
+
+                <div class="form-group checkbox-group">
+                    <label class="checkbox-label">
+                        <input type="checkbox" name="remember_me" value="1">
+                        <span class="checkbox-text">Remember me for 7 days</span>
+                    </label>
+                </div>
+
+                <button type="submit" class="login-button">
+                    Login to Dashboard
+                </button>
+            </form>
+
+            <div class="login-footer">
+                <p>Print Store Admin Panel v1.0</p>
+            </div>
+        </div>
+    </div>
+</body>
+
+</html>

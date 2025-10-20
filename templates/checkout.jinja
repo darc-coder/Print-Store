@@ -1,0 +1,410 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Printout Preview - Checkout</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/common.css') }}" />
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/checkout.css') }}" />
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/cart-widget.css') }}" />
+</head>
+
+<body>
+  <!-- Header -->
+  <div class="header">
+    <img src="{{ url_for('static', filename='assets/nitzInc.png') }}" alt="NitzInc Logo" class="logo" />
+    <div class="header-actions">
+      <button class="add-files-btn" onclick="triggerFileUpload()">
+        <span class="add-icon">+</span>
+        Add files
+      </button>
+    </div>
+    <input type="file" id="additionalFileInput" style="display: none"
+      accept=".pdf,.jpg,.jpeg,.png,.gif,.bmp,.tiff,.tif,.webp,.svg" onchange="handleAdditionalFile(event)" />
+  </div>
+
+  <!-- Main Container -->
+  <div class="container">
+    <h1 class="page-title">Printout preview ({{ cart.count }} file{{ 's' if cart.count != 1 else '' }})</h1>
+
+    <!-- Preview Section -->
+    <div class="preview-section">
+      <div class="preview-grid">
+        {% for job in cart.jobs %}
+        <!-- File Preview -->
+        <div class="preview-item">
+          <form method="POST" action="{{ url_for('user.remove_from_cart_route', job_id=job.id) }}"
+            style="display: inline">
+            <button type="submit" class="remove-btn">×</button>
+          </form>
+          <div class="preview-placeholder" id="previewPlaceholder{{ loop.index }}">
+            {% if job.preview_url %} {% if job.filename.lower().endswith('.pdf') %}
+            <embed src="{{ job.preview_url }}" type="application/pdf" width="100%" height="100%"
+              style="border-radius: 8px" />
+            {% else %}
+            <img src="{{ job.preview_url }}" alt="Preview" class="preview-image" />
+            {% endif %} {% else %}
+            <div style="
+                  display: flex;
+                  flex-direction: column;
+                  align-items: center;
+                  justify-content: center;
+                  height: 100%;
+                ">
+              <div style="font-size: 48px; color: #ccc; margin-bottom: 10px">📄</div>
+              <div style="color: #999; font-size: 0.9rem">{{ job.filename }}</div>
+            </div>
+            {% endif %}
+          </div>
+          <div class="file-info">File {{ loop.index }} ({{ job.pages }} page{{ 's' if job.pages != 1 else '' }})</div>
+        </div>
+        {% endfor %}
+
+        <!-- Add Page Placeholder -->
+        <div class="preview-item" style="cursor: pointer; border: 2px dashed #2e7d32; background: #f8fdf9"
+          onclick="triggerFileUpload()">
+          <div class="preview-placeholder">
+            <div class="add-page-icon">+</div>
+            <div class="add-page-text">Add Files</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Info Banner -->
+    <div class="info-banner">
+      <div class="info-icon">✓</div>
+      <div class="info-text">We will delete your files once printed</div>
+    </div>
+
+    <!-- Print Settings Form -->
+    <form action="{{ url_for('user.process_checkout') }}" method="POST" id="checkoutForm"
+      data-cost-per-page="{{ 5.0 }}">
+      <div class="settings-section">
+        <div class="settings-header">
+          <h2>Print settings</h2>
+          <p class="settings-subtitle">Same print settings apply to all files</p>
+        </div>
+
+        <!-- Number of Copies -->
+        <div class="setting-group">
+          <label class="setting-label">Choose number of copies</label>
+          <p class="setting-description">Copies of this file you want to print</p>
+          <div class="copies-control">
+            <button type="button" class="copies-btn" id="decreaseBtn" onclick="changeCopies(-1)">−</button>
+            <span class="copies-value" id="copiesValue">{{ cart.jobs[0].copies if cart.jobs else 1 }}</span>
+            {% for job in cart.jobs %}
+            <input type="hidden" name="copies_{{ job.id }}" class="copies-input" value="{{ job.copies }}" />
+            {% endfor %}
+            <button type="button" class="copies-btn" id="increaseBtn" onclick="changeCopies(1)">+</button>
+          </div>
+        </div>
+
+        <!-- Print Color Mode -->
+        <div class="setting-group">
+          <label class="setting-label">Choose print colour</label>
+          <p class="setting-description">Save money with black & white or get color printouts</p>
+          <div class="orientation-options">
+            <div class="orientation-option">
+              <input type="radio" name="print_color_all" id="bw" value="bw" checked onclick="setColorAll('bw')" />
+              <label for="bw" class="orientation-label">
+                <div class="color-icon bw">
+                  <svg width="40" height="40" viewBox="0 0 40 40" fill="none">
+                    <circle cx="15" cy="20" r="8" fill="#333" opacity="0.8" />
+                    <circle cx="25" cy="20" r="8" fill="#666" opacity="0.6" />
+                  </svg>
+                </div>
+                <div style="display: flex; flex-direction: column; align-items: center;">
+                  <span class="orientation-name">B&W</span>
+                  <span style="font-size: 0.85rem; color: #666;">₹5/page</span>
+                </div>
+              </label>
+            </div>
+            <div class="orientation-option">
+              <input type="radio" name="print_color_all" id="color" value="color" onclick="setColorAll('color')" />
+              <label for="color" class="orientation-label">
+                <div class="color-icon color">
+                  <svg width="40" height="40" viewBox="0 0 40 40" fill="none">
+                    <circle cx="20" cy="14" r="6" fill="#00BCD4" />
+                    <circle cx="14" cy="23" r="6" fill="#E91E63" />
+                    <circle cx="26" cy="23" r="6" fill="#FFEB3B" />
+                  </svg>
+                </div>
+                <div style="display: flex; flex-direction: column; align-items: center;">
+                  <span class="orientation-name">Color</span>
+                  <span style="font-size: 0.85rem; color: #666;">₹5/page</span>
+                </div>
+              </label>
+            </div>
+          </div>
+          {% for job in cart.jobs %}
+          <input type="hidden" name="print_color_{{ job.id }}" class="color-input" value="bw" />
+          {% endfor %}
+        </div>
+
+        <!-- Print Orientation -->
+        <div class="setting-group">
+          <label class="setting-label">Choose print orientation</label>
+          <p class="setting-description">Direction in which a document is displayed or printed</p>
+          <div class="orientation-options">
+            <div class="orientation-option">
+              <input type="radio" name="orientation_all" id="portrait" value="portrait" checked
+                onclick="setOrientationAll('portrait')" />
+              <label for="portrait" class="orientation-label">
+                <div class="orientation-icon portrait"></div>
+                <span class="orientation-name">Portrait</span>
+              </label>
+            </div>
+            <div class="orientation-option">
+              <input type="radio" name="orientation_all" id="landscape" value="landscape"
+                onclick="setOrientationAll('landscape')" />
+              <label for="landscape" class="orientation-label">
+                <div class="orientation-icon landscape"></div>
+                <span class="orientation-name">Landscape</span>
+              </label>
+            </div>
+          </div>
+          {% for job in cart.jobs %}
+          <input type="hidden" name="orientation_{{ job.id }}" class="orientation-input" value="portrait" />
+          {% endfor %}
+        </div>
+      </div>
+
+      <!-- Cart Summary -->
+      <div class="cart-summary">
+        <div class="cart-info">
+          <div class="cart-icon">
+            <img src="{{ url_for('static', filename='assets/print-web.webp') }}" alt="Print" />
+          </div>
+          <div class="cart-details">
+            <div class="cart-pages">
+              Total <span id="totalPages">{{ cart.total_pages }}</span> page{{ 's' if cart.total_pages != 1 else '' }}
+            </div>
+            <div class="cart-cost">₹<span id="totalCost">{{ cart.total_cost }}</span></div>
+          </div>
+        </div>
+        <button type="button" class="view-cart-btn" onclick="openPaymentSidebar()">View cart</button>
+      </div>
+    </form>
+  </div>
+
+  <script>
+    // Store base data for calculations
+    const cartData = {{ cart.jobs | tojson | safe }};
+    const costPerPage = parseFloat(document.getElementById('checkoutForm').dataset.costPerPage);
+
+    // Initialize copies from the first job in cart (all jobs have same copies)
+    let copies = cartData.length > 0 ? cartData[0].copies : 1;
+
+    function changeCopies(delta) {
+      copies = Math.max(1, Math.min(99, copies + delta));
+      document.getElementById('copiesValue').textContent = copies;
+
+      // Update all hidden inputs
+      document.querySelectorAll('.copies-input').forEach(input => {
+        input.value = copies;
+      });
+
+      updateTotals();
+
+      // Update all jobs in cart via API
+      updateCartItemsInDatabase(copies);
+
+      // Update button states
+      document.getElementById('decreaseBtn').disabled = copies <= 1;
+      document.getElementById('increaseBtn').disabled = copies >= 99;
+    }
+
+    async function updateCartItemsInDatabase(newCopies) {
+      // Update all jobs in cart
+      for (const job of cartData) {
+        try {
+          await fetch('/api/update-cart-item', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+              job_id: job.id,
+              copies: newCopies
+            })
+          });
+        } catch (error) {
+          console.error('Error updating cart item:', error);
+        }
+      }
+
+      // Refresh the cart widget after updating
+      if (window.refreshCart) {
+        window.refreshCart();
+      }
+    }
+
+    function setOrientationAll(orientation) {
+      // Update all hidden orientation inputs
+      document.querySelectorAll('.orientation-input').forEach(input => {
+        input.value = orientation;
+      });
+
+      // Update orientation in database via API
+      updateOrientationInDatabase(orientation);
+    }
+
+    function setColorAll(colorMode) {
+      // Update all hidden color inputs
+      document.querySelectorAll('.color-input').forEach(input => {
+        input.value = colorMode;
+      });
+
+      // Update color mode in database via API
+      updateColorInDatabase(colorMode);
+    }
+
+    async function updateOrientationInDatabase(newOrientation) {
+      // Update all jobs in cart
+      for (const job of cartData) {
+        try {
+          await fetch('/api/update-cart-item', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+              job_id: job.id,
+              orientation: newOrientation
+            })
+          });
+        } catch (error) {
+          console.error('Error updating orientation:', error);
+        }
+      }
+
+      // Refresh cart widget after orientation change
+      if (window.refreshCart) {
+        window.refreshCart();
+      }
+    }
+
+    async function updateColorInDatabase(newColorMode) {
+      // Update all jobs in cart
+      for (const job of cartData) {
+        try {
+          await fetch('/api/update-cart-item', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+              job_id: job.id,
+              print_color: newColorMode
+            })
+          });
+        } catch (error) {
+          console.error('Error updating color mode:', error);
+        }
+      }
+
+      // Refresh cart widget after color change
+      if (window.refreshCart) {
+        window.refreshCart();
+      }
+    }
+
+    function updateTotals() {
+      let totalPages = 0;
+      let totalCost = 0;
+
+      cartData.forEach(job => {
+        totalPages += job.pages * copies;
+        totalCost += job.pages * costPerPage * copies;
+      });
+
+      document.getElementById('totalPages').textContent = totalPages;
+      document.getElementById('totalCost').textContent = totalCost.toFixed(0);
+    }
+
+    function triggerFileUpload() {
+      document.getElementById('additionalFileInput').click();
+    }
+
+    function handleAdditionalFile(event) {
+      const file = event.target.files[0];
+      if (!file) return;
+
+      // Create FormData and upload the file
+      const formData = new FormData();
+      formData.append('file', file);
+
+      // Show loading indicator
+      const addFileBtn = document.querySelector('.add-files-btn');
+      const originalContent = addFileBtn.innerHTML;
+      addFileBtn.innerHTML = '<span style="font-size: 0.9rem;">Uploading...</span>';
+      addFileBtn.disabled = true;
+
+      // Upload the file
+      fetch('/upload', {
+        method: 'POST',
+        body: formData
+      })
+        .then(response => {
+          if (response.redirected) {
+            // Refresh cart widget before reload
+            if (window.refreshCart) {
+              window.refreshCart();
+            }
+            // Reload page to show new file in cart
+            window.location.reload();
+          } else {
+            throw new Error('Upload failed');
+          }
+        })
+        .catch(error => {
+          console.error('Error uploading file:', error);
+          alert('Failed to upload file. Please try again.');
+          addFileBtn.innerHTML = originalContent;
+          addFileBtn.disabled = false;
+        });
+    }
+
+    // Payment sidebar functions - Use cart-widget's sidebar
+    function openPaymentSidebar() {
+      // Refresh cart data before opening
+      if (window.refreshCart) {
+        window.refreshCart();
+      }
+      // Open the cart-widget sidebar
+      if (window.openCartSidebar) {
+        window.openCartSidebar();
+      }
+    }
+
+    function closePaymentSidebar() {
+      // Close the cart-widget sidebar
+      if (window.closeCartSidebar) {
+        window.closeCartSidebar();
+      }
+    }
+
+    // Initialize on page load
+    document.addEventListener('DOMContentLoaded', function () {
+      // Set copies value from database
+      document.getElementById('copiesValue').textContent = copies;
+
+      // Update all hidden inputs with current copies
+      document.querySelectorAll('.copies-input').forEach(input => {
+        input.value = copies;
+      });
+
+      // Update button states
+      document.getElementById('decreaseBtn').disabled = copies <= 1;
+      document.getElementById('increaseBtn').disabled = copies >= 99;
+
+      // Update totals on page load
+      updateTotals();
+    });
+  </script>
+  <script src="{{ url_for('static', filename='js/cart-widget.js') }}"></script>
+</body>
+
+</html>
