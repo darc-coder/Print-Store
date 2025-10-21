@@ -21,7 +21,7 @@ NoNewPrivileges=true
 PrivateTmp=true
 ProtectSystem=strict
 ProtectHome=read-only
-ReadWritePaths=/home/pi/RpiPrint/uploads /home/pi/RpiPrint/screenshots /home/pi/RpiPrint/jobs.db /home/pi/RpiPrint/rpiprint.log
+ReadWritePaths=/home/pi/RpiPrint/uploads /home/pi/RpiPrint/screenshots /home/pi/RpiPrint
 
 [Install]
 WantedBy=multi-user.target

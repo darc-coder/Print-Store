@@ -1,0 +1,21 @@
+[Unit]
+Description=RpiPrint Flask Application (Simple)
+After=network.target
+
+[Service]
+Type=simple
+User=pi
+WorkingDirectory=/home/pi/RpiPrint
+ExecStart=/home/pi/RpiPrint/start_rpiprint.sh
+Restart=always
+RestartSec=10
+
+# Simple environment - no complex security restrictions
+Environment="PATH=/home/pi/RpiPrint/venv/bin:/usr/local/bin:/usr/bin:/bin"
+
+# Output to systemd journal
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target
