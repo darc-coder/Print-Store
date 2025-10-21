@@ -6,6 +6,7 @@ Optimized for Raspberry Pi 4 with Cloudflare Tunnel
 import os
 import sys
 import logging
+import signal
 from pathlib import Path
 
 # Set production environment
@@ -17,8 +18,11 @@ sys.path.insert(0, str(Path(__file__).parent))
 # Import configuration
 from config_production import ProductionConfig
 
-# Import the Flask app
-from app import app, socketio
+# Import the Flask app factory
+from app import create_app
+
+# Import CUPS monitor
+from services.cups_monitor import start_cups_monitor, stop_cups_monitor
 
 def setup_logging():
     """Configure production logging"""
@@ -31,7 +35,7 @@ def setup_logging():
         ]
     )
 
-def configure_app():
+def configure_app(app):
     """Apply production configuration"""
     app.config.update(
         DEBUG=False,
@@ -53,6 +57,23 @@ def configure_app():
             response.headers[header] = value
         return response
 
+def setup_signal_handlers():
+    """Setup signal handlers for graceful shutdown"""
+    def signal_handler(sig, frame):
+        print("\n\n" + "="*60)
+        print("🛑 Shutdown signal received (Ctrl+C)")
+        print("="*60)
+        print("⏳ Stopping CUPS monitor...")
+        stop_cups_monitor()
+        print("✅ CUPS monitor stopped")
+        print("⏳ Shutting down server...")
+        print("="*60 + "\n")
+        sys.exit(0)
+    
+    # Register signal handlers
+    signal.signal(signal.SIGINT, signal_handler)
+    signal.signal(signal.SIGTERM, signal_handler)
+
 def main():
     """Run the production server"""
     print("=" * 70)
@@ -63,8 +84,20 @@ def main():
     setup_logging()
     logger = logging.getLogger('rpiprint')
     
-    # Configure app
-    configure_app()
+    # Create Flask app and SocketIO instance
+    print("\n📦 Creating Flask app...")
+    app, socketio = create_app()
+    
+    # Apply production configuration
+    print("🔧 Applying production configuration...")
+    configure_app(app)
+    
+    # Setup signal handlers
+    setup_signal_handlers()
+    
+    # Start CUPS monitor
+    print("🔄 Starting CUPS monitor...")
+    start_cups_monitor(socketio, app)
     
     # Display configuration
     print(f"\n✅ Server Configuration:")
@@ -87,7 +120,7 @@ def main():
     print("   - Port 5500 is for Cloudflare Tunnel only")
     print("   - Do NOT expose port 5500 directly to internet")
     print("   - All external access should go through Cloudflare Tunnel")
-    print("=" * 70)
+    print("=" * 70 + "\n")
     
     logger.info("Starting RpiPrint production server...")
     

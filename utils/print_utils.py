@@ -36,10 +36,12 @@ def print_file(file_path, printer="G3000-series", copies=1, orientation="portrai
     # Add color mode option (Canon-specific options)
     if color_mode == 'bw':
         # Use Canon's Grayscale option for B&W printing
-        cmd.extend(['-o', 'CNIJGrayScale=1'])
+        cmd.extend(['-o', 'ColorModel=Gray'])
+        # cmd.extend(['-o', 'CNIJGrayScale=1'])
     else:
         # Use default color mode (CNIJGrayScale=0)
-        cmd.extend(['-o', 'CNIJGrayScale=0'])
+        cmd.extend(['-o', 'ColorModel=RGB'])
+        # cmd.extend(['-o', 'CNIJGrayScale=0'])
     
     cmd.append(file_path)
     
